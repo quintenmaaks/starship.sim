@@ -418,6 +418,31 @@ export class ShipReturnProgram extends Program {
         return;
       }
     }
+    // geen doel: gecontroleerde landing in de oceaan (flip + landingsbrand)
+    if (!this.tgt && T.alt < 6000 && T.mach < 0.8) {
+      const vd = -T.vVert;
+      const m = v.mass;
+      let F = 0;
+      for (const e of v.active.engines) if (!e.failed && e.spec.kind === 'sl' && e.spec.ring === 0) F += e.spec.thrustVac * 0.97;
+      const aT = Math.min(F / m * 0.8, 4 * G0);
+      // 1D-voorspelling
+      if (!(this as any).oceanBurn) {
+        let h = T.alt, vv = vd, t = 0;
+        while (vv > 0 && h > -20 && t < 60) { const rho = atmosphere(Math.max(0, h)).rho; const drag = 0.5 * rho * vv * vv * 1.4 * v.length * 9 / m; vv += (9.81 - drag - (t > 4.5 ? aT : 0)) * 0.1; h -= vv * 0.1; t += 0.1; }
+        if (h < 120) { (this as any).oceanBurn = true; w.emit('Flip-manoeuvre boven zee! Motoren herstarten', 'flip', v); }
+      }
+      if ((this as any).oceanBurn) {
+        this.phase = 'Landingsbrand (oceaan)';
+        v.selectEngines('three'); v.legsDown = true;
+        const h = Math.max(T.alt - 3, 0.5);
+        const aReq = vd > 0 ? vd * vd / (2 * h) : 0;
+        const ay = 9.81 + (vd > 3 ? aReq * 1.05 : (vd - 2) * 2);
+        const align = Math.max(0, v.nose().dot(up));
+        v.cmdThrottle = clamp(ay * m / Math.max(F, 1) * (align > 0.94 ? 1 : Math.pow(align, 6)), 0.01, 1);
+        point(v, up, v.belly());
+        return;
+      }
+    }
     // buikhouding
     let alpha = T.mach > 3 ? 68 : T.mach > 1 ? 75 : 88;
     if (T.alt > ATMO_TOP) alpha = 65;

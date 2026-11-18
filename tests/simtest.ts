@@ -15,6 +15,7 @@ function run(name: string, setup: (w: World) => any, maxT: number) {
   let last = 0;
   while (w.t < maxT) {
     w.step(w.dt);
+    const sv = (w as any)._v; if (sv && sv._chk) sv._chk();
     if (w.t - last > (process.env.FINE && w.vehicles.some(v=>(v.ap?.phase||'').startsWith('Landing')) ? 1 : 20)) {
       last = w.t;
       const s = w.vehicles.map((v) => `${v.name}[${v.state}] alt=${(v.tel.alt / 1000).toFixed(2)}km v=${v.tel.vSurf.toFixed(0)} vv=${v.tel.vVert.toFixed(0)} q=${(v.tel.q/1000).toFixed(1)} prop=${(v.propFrac*100).toFixed(0)}% thr=${v.cmdThrottle.toFixed(2)} n=${v.enginesRunning()} g=${v.tel.gLoad.toFixed(1)} tilt=${v.tel.tilt.toFixed(0)} ${v.ap?.phase ?? ''} ${v.ap?.status ?? ''}`).join(' | ');
@@ -61,4 +62,20 @@ if (which === 'catchdbg') {
   }, 120);
   const b = w.vehicles[0];
   console.log('local', w.toLocal('gulf', b.pos), w.towers[0].armH, w.towers[0].armTargetH, b.length);
+}
+if (which === 'ift') {
+  run('ift', (w) => {
+    const v = w.spawnOnPad(designToSpec(BUILTIN_DESIGNS[2]), 'stack', 'gulf', 'olm');
+    w.launchT = 3;
+    const pad = REGIONS.gulf.pads.find((p) => p.id === 'olm')!;
+    const ap = new AscentProgram(v, { apo: 200000, peri: -30000, azimuth: 92, boosterReserve: 0.115, onStage: (ship, b) => {
+      b.ap = new BoostbackProgram(b, { region: 'gulf', pad: null, x: 29000, z: 2000, y: 0, water: true });
+    } });
+    v.ap = ap;
+    const iv = setInterval(() => {}, 1000); clearInterval(iv);
+    (v as any)._chk = () => { if (ap.done && !(v as any)._ret) { (v as any)._ret = true; v.ap = new ShipReturnProgram(v, null); } };
+    w.on(() => (v as any)._chk());
+    w.on((e) => { if (e.kind === 'seco') { setTimeout(()=>{},0); } });
+    (w as any)._v = v;
+  }, 4200);
 }
