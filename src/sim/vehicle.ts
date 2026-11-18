@@ -289,6 +289,10 @@ export function aeroForce(v: Vehicle, qdyn: number, mach: number, vrelW: THREE.V
   let cda = mach < 0.8 ? 0.35 : mach < 1.1 ? 0.35 + (mach - 0.8) / 0.3 * 0.55 : Math.max(0.5, 0.9 - (mach - 1.1) * 0.12);
   let cn = mach < 0.8 ? 1.0 : mach < 1.2 ? 1.0 + (mach - 0.8) * 1.0 : 1.4;
   const st = v.active;
+  // stomp achterwaarts (motoren eerst): hogere basisweerstand
+  _qa.copy(v.q).invert();
+  const uy0 = _a.copy(vrelW).multiplyScalar(1 / vr).applyQuaternion(_qa).y;
+  if (uy0 < -0.5) cda = mach < 0.8 ? 0.9 : mach < 1.2 ? 0.9 + (mach - 0.8) * 1.0 : 1.3;
   if (st.spec.gridFins && v.finsOut) cda += 0.6 * st.finHealth;
   if (v.legsDown) cda += 0.05;
   // body-frame luchtstroom

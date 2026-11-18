@@ -102,7 +102,7 @@ export function boosterSpec(d: BoosterDesign): StageSpec {
   return {
     name: 'Super Heavy', kind: 'booster', dry, propMax: PROP_PER_M_BOOSTER * d.tankLen, length: d.tankLen + 9 + (d.hotStage ? 2 : 0), diameter: 9,
     engines, gridFins: d.gridFins > 0, flaps: false, heatShield: 0, legs: d.legs, catchPins: d.catchPins, crew: 0, payload: 0,
-    payloadBay: false, tanker: false, cabin: false, rcs: 150000, maxQ: 60000, maxG: 6, tankLen: d.tankLen, parts,
+    payloadBay: false, tanker: false, cabin: false, rcs: 150000, maxQ: 160000, maxG: 8, tankLen: d.tankLen, parts,
   };
 }
 export function designToSpec(d: Design): VehicleSpec {

@@ -120,9 +120,30 @@ export class LandingGuidance {
     const set = this.v.active.spec.kind === 'booster' ? 'inner' : 'three';
     const a = this.availThrust(set).F / this.v.mass;
     const vy = Math.min(0, ls.vel.y);
-    const net = Math.max(0.5, a * 0.72 - ls.g);
+    const net = Math.max(0.5, Math.min(a * 0.72, 4.6 * G0) - ls.g);
     const vtot = Math.hypot(vy, Math.min(Math.hypot(ls.vel.x, ls.vel.z), 60));
     return vtot * vtot / (2 * net) + Math.abs(vy) * 2.2 + 25;
+  }
+  // 1D-voorspelling met weerstand: stopt het voertuig boven het doel als we nu ontsteken?
+  shouldIgnite(ls: LocalState, cda: number, margin = 60) {
+    const set = this.v.active.spec.kind === 'booster' ? 'inner' : 'three';
+    const m = this.v.mass;
+    const aT = Math.min(this.availThrust(set).F / m * 0.8, 4.6 * G0);
+    let h = ls.p.y - this.tgt.y, vd = -ls.vel.y; // omlaag positief
+    const vh = Math.hypot(ls.vel.x, ls.vel.z);
+    const earth = REGIONS[this.tgt.region].body === 'earth';
+    const dt = 0.1;
+    let t = 0;
+    // ontsteking + flip-vertraging
+    const delay = this.v.active.spec.kind === 'ship' ? 4.5 : 1.5;
+    while (vd > 0 && h > -50 && t < 120) {
+      const rho = earth ? atmosphere(Math.max(0, h + this.tgt.y)).rho : 0;
+      const drag = 0.5 * rho * vd * vd * cda / m;
+      const thr = t > delay ? aT * Math.min(1, vd / Math.max(vd, 1)) : 0;
+      vd += (ls.g - drag - thr) * dt;
+      h -= vd * dt; t += dt;
+    }
+    return h < margin + vh * 1.2;
   }
   update(dt: number, w: World) {
     const v = this.v;
@@ -134,28 +155,54 @@ export class LandingGuidance {
     const ex = this.tgt.x - ls.p.x, ez = this.tgt.z - ls.p.z;
     const dist = Math.hypot(ex, ez);
     const aMax0 = av.F / m;
-    let vt: number;
-    if (h > 0) vt = -Math.max(this.tgt.catchTower ? 0.8 : 1.4, Math.sqrt(2 * Math.max(aMax0 * 0.55 - ls.g, 0.4) * h));
-    else vt = -0.6;
-    if (h < 15) vt = Math.max(vt, this.tgt.catchTower ? -1.0 : -2.0);
-    // laterale geleiding
-    const tgo = Math.max(3, h / Math.max(Math.abs(ls.vel.y), 4));
-    let vhx = ex / tgo, vhz = ez / tgo;
-    const vhm = Math.hypot(vhx, vhz), lim = clamp(h * 0.08 + 1, 1, 40);
-    if (vhm > lim) { vhx *= lim / vhm; vhz *= lim / vhm; }
-    if (h < 30) { const k = Math.min(1, 1.5 / Math.max(dist, 0.01)); vhx = clamp(ex * 0.3, -1.2, 1.2); vhz = clamp(ez * 0.3, -1.2, 1.2); }
-    let ax = (vhx - ls.vel.x) * 1.4, az = (vhz - ls.vel.z) * 1.4;
-    const ay = ls.g + (vt - ls.vel.y) * 1.6;
-    const tiltMax = (h < 6 ? 4 : h < 40 ? 9 : this.maxTilt) * Math.PI / 180;
-    const latMax = Math.max(ay, 0.5) * Math.tan(tiltMax);
+    let vt = 0;
+    let ayReq: number;
+    const vy = ls.vel.y;
+    const hEff = h - (this.tgt.catchTower ? 7 : 4);
+    if (hEff > 3 && vy < -1.5) {
+      const aReq = vy * vy / (2 * hEff);
+      ayReq = ls.g + aReq * 1.08;
+      vt = vy;
+    } else {
+      vt = this.tgt.catchTower ? -0.8 : -1.2;
+      // eerst uitlijnen, dan zakken (vangst: zweven tot binnen 2 m)
+      if ((dist > (this.tgt.catchTower ? 1.8 : 6) || Math.hypot(ls.vel.x, ls.vel.z) > 1.0) && h > 2) vt = this.tgt.catchTower ? 0 : -0.4;
+      ayReq = ls.g + (vt - vy) * 2.0;
+    }
+    // laterale geleiding (zero-effort-miss)
+    const tgo = Math.max(1.5, 2 * Math.max(hEff, 0) / Math.max(Math.abs(ls.vel.y), 2));
+    let ax: number, az: number;
+    if (hEff > 3) {
+      // optimale geleiding met eindsnelheid 0 (ZEM/ZEV)
+      const tg = Math.max(tgo, 2.5);
+      ax = 6 * ex / (tg * tg) - 4 * ls.vel.x / tg;
+      az = 6 * ez / (tg * tg) - 4 * ls.vel.z / tg;
+    } else {
+      ax = clamp(ex, -6, 6) * 0.5 - ls.vel.x * 1.5;
+      az = clamp(ez, -6, 6) * 0.5 - ls.vel.z * 1.5;
+    }
+    const vhx = clamp(ex / tgo, -40, 40), vhz = clamp(ez / tgo, -40, 40);
+    const ay = ayReq;
+    const tiltMax = (h < 2 ? 4 : h < 60 ? 10 : this.maxTilt) * Math.PI / 180;
+    const latMax = Math.max(ay, 0.6 * ls.g) * Math.tan(tiltMax);
+    // aerodynamische stuurhulp (roosterroeren/flaps) in dichte lucht
+    if (v.tel.q > 1500 && h > 30) {
+      const fin = (v.active.spec.gridFins && v.finsOut ? v.active.finHealth : 0) + (v.active.spec.flaps ? v.active.flapHealth * 0.6 : 0);
+      if (fin > 0) {
+        let cx = (vhx - ls.vel.x) * 0.5, cz = (vhz - ls.vel.z) * 0.5; const cm = Math.hypot(cx, cz); const L = Math.min(3, v.tel.q / 8000) * fin;
+        if (cm > L) { cx *= L / cm; cz *= L / cm; }
+        v.vel.addScaledVector(new THREE.Vector3(cx, 0, cz).applyQuaternion(ls.quat), dt);
+      }
+    }
     const al = Math.hypot(ax, az);
     if (al > latMax) { ax *= latMax / al; az *= latMax / al; }
-    const need = Math.hypot(ax, Math.max(ay, 0.3), az) * m;
+    const need = Math.min(Math.hypot(ax, Math.max(ay, 0.3), az), 5.5 * G0) * m;
     // motoren schakelen
     const order: any[] = v.active.spec.kind === 'booster' ? ['inner', 'center', 'single'] : ['three', 'single'];
     let idx = Math.max(0, order.indexOf(this.engineSet));
-    if (need < av.Fmin * 0.98 && idx < order.length - 1 && h < 400) idx++;
-    else if (need > av.F * 0.97 && idx > 0) idx--;
+    (this as any).lowT = need < av.Fmin * 0.92 ? ((this as any).lowT || 0) + dt : 0;
+    if ((this as any).lowT > 0.6 && idx < order.length - 1 && h < 500) { idx++; (this as any).lowT = 0; }
+    else if (need > av.F * 1.0 && idx > 0) idx--;
     if (order[idx] !== this.engineSet) { this.engineSet = order[idx]; av = this.availThrust(this.engineSet); }
     this.applySet(this.engineSet);
     const dirL = new THREE.Vector3(ax, Math.max(ay, 0.3), az).normalize();
@@ -168,6 +215,7 @@ export class LandingGuidance {
     const belly = v.belly();
     point(v, dirW, belly);
     if (h < 400 && v.active.spec.legs) v.legsDown = true;
+    if ((globalThis as any).CATCHDBG && h < 12) console.log("LG", ls.p.x.toFixed(2), w.toLocal(this.tgt.region, v.pos).x.toFixed(2), v.id, ex.toFixed(2), ez.toFixed(2), h.toFixed(1), ax.toFixed(2), az.toFixed(2), "vel", ls.vel.x.toFixed(2), "nose", v.nose().applyQuaternion(ls.inv).x.toFixed(3), "acc", v.accel.clone().applyQuaternion(ls.inv).x.toFixed(2), v.cmdThrottle.toFixed(2), v.enginesRunning());
     return { h, dist, vt };
   }
 }
@@ -228,7 +276,7 @@ export class AscentProgram extends Program {
         dir = ang < maxA ? tgt : pro.clone().lerp(tgt, maxA / ang).normalize();
         if (T.vSurf < 120) dir = up.clone().lerp(horiz, 0.05 * (T.vSurf - 60) / 60).normalize();
       }
-      point(v, dir, up.clone().multiplyScalar(-1));
+      point(v, dir, horiz.clone().negate().addScaledVector(up, -0.5));
       const mq = this.plan.maxQThrottle ?? 0.72;
       v.cmdThrottle = T.q > 30000 ? mq : 1;
       if (T.gLoad > 3.6) v.cmdThrottle = Math.max(0.45, v.cmdThrottle - 0.2);
@@ -276,7 +324,8 @@ export class AscentProgram extends Program {
 export class BoostbackProgram extends Program {
   t = 0; tgt: LandTarget; lg: LandingGuidance; bbDone = false;
   constructor(v: Vehicle, tgt: LandTarget) { super(v); this.tgt = tgt; this.lg = new LandingGuidance(v, tgt, 16); this.phase = 'Flip'; }
-  cda() { return (0.9 + (this.v.finsOut ? 0.6 : 0)) * Math.PI * 20.25; }
+  cda() { return (1.25 + (this.v.finsOut ? 0.6 : 0)) * Math.PI * 20.25; }
+  estF() { let F = 0; for (const e of this.v.active.engines) if (!e.failed && e.selected) F += e.spec.thrustVac; return F; }
   update(dt: number, w: World) {
     const v = this.v;
     if (v.state !== 'flying') { this.done = true; return; }
@@ -300,8 +349,10 @@ export class BoostbackProgram extends Program {
       this.status = `Inslagfout ${(err / 1000).toFixed(1)} km`;
       const ang = angleTo(v, dirW);
       v.selectEngines('inner');
-      v.cmdThrottle = ang < 20 && v.active.prop > 0 ? clamp(err / 20000, 0.4, 1) : 0;
-      if (err < 300 || ((this as any).lastErr !== undefined && err > (this as any).lastErr + 50 && err < 5000) || v.propFrac < 0.035) {
+      const Fb = v.thrustInfo(0).F || this.estF();
+      const gl = Math.min(1, 4.0 * G0 * v.mass / Math.max(1, this.estF()));
+      v.cmdThrottle = ang < 20 && v.active.prop > 0 ? clamp(Math.min(err / 20000, gl), 0.4, 1) : 0;
+      if (err < 300 || ((this as any).lastErr !== undefined && err > (this as any).lastErr + 50 && err < 5000) || v.propFrac < 0.022) {
         v.cmdThrottle = 0; this.bbDone = true; w.emit('Boostback voltooid', 'info', v);
       }
       (this as any).lastErr = err;
@@ -309,8 +360,7 @@ export class BoostbackProgram extends Program {
     }
     const ls = localState(w, v, this.tgt.region);
     const h = ls.p.y - this.tgt.y;
-    const sd = this.lg.stopDist(ls);
-    if (!this.lg.ignited && (h > sd || T.vVert > 0)) {
+    if (!this.lg.ignited && (T.vVert > 0 || !this.lg.shouldIgnite(ls, this.cda(), 80))) {
       // uitrollen: motoren vooruit, stuur met roosterroeren
       v.finsOut = true;
       v.cmdThrottle = 0;
@@ -320,7 +370,9 @@ export class BoostbackProgram extends Program {
       else {
         const pr = predictImpact(w, v, this.cda(), this.tgt.region, 600);
         const e = new THREE.Vector3(this.tgt.x - pr.local.x, 0, this.tgt.z - pr.local.z).applyQuaternion(w.frames[this.tgt.region].quat);
-        const tilt = clamp(e.length() / 3000, 0, 1) * 0.12;
+        const tilt = clamp(e.length() / 1500, 0, 1) * 0.2;
+        // roosterroeren: aerodynamisch glijden richting doel
+        if (T.q > 2000) { const L = Math.min(4, T.q / 10000) * v.active.finHealth; v.vel.addScaledVector(e.clone().normalize(), Math.min(L, e.length() / 200) * dt); }
         if (e.lengthSq() > 1) nose.addScaledVector(e.normalize(), -tilt).normalize();
         this.status = `Afwijking ${(Math.hypot(this.tgt.x - pr.local.x, this.tgt.z - pr.local.z)).toFixed(0)} m`;
       }
@@ -356,8 +408,7 @@ export class ShipReturnProgram extends Program {
         const tw = w.towers.find((x) => x.region === this.tgt!.region && x.pad.id === this.tgt!.pad?.id);
         if (tw) tw.armTargetH = this.tgt.y + v.length * 0.86;
       }
-      const sd = this.lg.stopDist(ls);
-      if (!this.lg.ignited && h < sd + 280 && T.alt < 20000 && dist < 30000) {
+      if (!this.lg.ignited && T.alt < 20000 && dist < 30000 && this.lg.shouldIgnite(ls, 1.4 * v.length * 9, 150)) {
         this.lg.ignited = true; w.emit('Flip-manoeuvre! Motoren herstarten', 'flip', v);
       }
       if (this.lg.ignited) {
@@ -452,7 +503,6 @@ export class HopProgram extends Program {
       return;
     }
     if (this.stage === 'fall') {
-      const sd = this.lg.stopDist(ls);
       const hh = h - this.tgt.y;
       this.phase = 'Buiklanding (belly flop)';
       v.cmdThrottle = 0; v.flapsOn = true;
@@ -477,7 +527,7 @@ export class HopProgram extends Program {
         v.vel.addScaledVector(new THREE.Vector3(cx, 0, cz).applyQuaternion(ls.quat), dt);
       }
       this.status = `Afstand ${Math.hypot(ex, ez).toFixed(0)} m`;
-      if (hh < sd + 260) { this.stage = 'land'; this.lg.ignited = true; w.emit('Flip-manoeuvre! Motoren herstarten', 'flip', v); }
+      if (this.lg.shouldIgnite(ls, 1.4 * v.length * 9, 150)) { this.stage = 'land'; this.lg.ignited = true; w.emit('Flip-manoeuvre! Motoren herstarten', 'flip', v); }
       return;
     }
     this.phase = 'Landing';

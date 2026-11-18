@@ -203,12 +203,18 @@ export class World {
   }
 
   step(dt: number) {
-    this.t += dt;
-    this.updateFrames();
     // windvlagen
     this.gustT -= dt;
     if (this.gustT < 0) { this.gustT = 2 + this.rng() * 5; this.gust = (this.rng() - 0.3) * this.windStrength * 0.8; }
-    for (const v of this.vehicles.slice()) this.stepVehicle(v, dt);
+    const list = this.vehicles.slice();
+    const regs = list.map((v) => this.stepVehicle(v, dt));
+    // tijd en frames naar t+dt, daarna contact
+    this.t += dt;
+    this.updateFrames();
+    list.forEach((v, i) => {
+      if (this.anchors.has(v)) { this.applyAnchor(v); return; }
+      if (regs[i] !== undefined && v.state === 'flying') this.ground(v, this.regionFor(v, this.dominant(v.pos)), dt);
+    });
     this.towersStep(dt);
     this.postStep(dt);
   }
@@ -280,10 +286,10 @@ export class World {
     return { h, water, pad };
   }
 
-  stepVehicle(v: Vehicle, dt: number) {
-    if (v.state === 'destroyed') return;
-    if (v.state === 'splashed' && !this.anchors.has(v)) { v.pos.applyAxisAngle(new THREE.Vector3(0, 1, 0), OMEGA_E * dt); this.telemetry(v); return; }
-    if (v.ap) v.ap.update(dt, this);
+  stepVehicle(v: Vehicle, dt: number): RegionFrame | null | undefined {
+    if (v.state === 'destroyed') return undefined;
+    if (v.state === 'splashed' && !this.anchors.has(v)) { v.pos.applyAxisAngle(new THREE.Vector3(0, 1, 0), OMEGA_E * dt); this.telemetry(v); return undefined; }
+    if (v.ap && !v.ap.done) v.ap.update(dt, this);
     const up = this.telemetry(v).clone();
     const T = v.tel;
     if (v.avionicsGlitch > 0) v.avionicsGlitch -= dt;
@@ -301,7 +307,7 @@ export class World {
       } else {
         this.applyAnchor(v);
         if (v.state === 'clamped' && th.F > 0) (v as any).staticFireTime = ((v as any).staticFireTime || 0) + dt;
-        return;
+        return undefined;
       }
     }
     // ---- motoren ----
@@ -339,18 +345,17 @@ export class World {
     this.heating(v, vr, dt, uBody);
     // ---- belastingen ----
     this.loads(v, qdyn, dt);
-    if (v.state === 'destroyed') { this.emit('', 'explode', v); return; }
+    if (v.state === 'destroyed') { this.emit('', 'explode', v); return undefined; }
     // sonische knal
     const prevM = (v as any)._prevMach || 0;
     if (prevM > 1 && T.mach <= 1 && T.alt < 20000 && v.tel.vVert < 0) this.emit('Sonische knal', 'boom', v);
     (v as any)._prevMach = T.mach;
-    // ---- grond ----
-    this.ground(v, reg, dt);
+    return reg || null;
   }
 
   integrate(v: Vehicle, extra: THREE.Vector3, dt: number) {
     // RK4 voor zwaartekracht met constante extra versnelling
-    const e = this.ephem, t = this.t - dt;
+    const e = this.ephem, t = this.t;
     const p0 = v.pos.clone(), v0 = v.vel.clone();
     const a1 = e.gravity(p0, t, new THREE.Vector3()).add(extra);
     const p2 = p0.clone().addScaledVector(v0, dt / 2), v2 = v0.clone().addScaledVector(a1, dt / 2);
@@ -403,7 +408,7 @@ export class World {
       const qa = q * Math.sin(Math.min(T.alpha, 180 - T.alpha) * Math.PI / 180);
       if (qa > 9000 * strength && T.alpha < 120) v.destroy(`Constructief bezweken: q·α te hoog (${(qa / 1000).toFixed(1)} kPa)`);
     } else if (st.spec.kind === 'booster') {
-      if (q > 75000 * strength) v.destroy('Booster bezweken onder aerodynamische belasting');
+      if (q > 250000 * strength) v.destroy('Booster bezweken onder aerodynamische belasting');
     }
     if (q > st.spec.maxQ * 1.6 * strength) v.destroy('Te hoge dynamische druk');
     if (T.gLoad > st.spec.maxG * strength * (v.stages.length > 1 ? 1 : 1.3)) v.destroy(`Te hoge g-belasting (${T.gLoad.toFixed(1)} g)`);
@@ -429,6 +434,7 @@ export class World {
       return;
     }
     const l = this.toLocal(reg.def.id, v.pos, _v1);
+    if ((globalThis as any).CATCHDBG && v.role === "booster" && l.y < 60) console.log("GR", v.id, l.x.toFixed(2), l.y.toFixed(2), l.z.toFixed(2), this.towers.length, v.active.spec.catchPins, v.stages.length);
     // torenbotsing / vangst
     for (const tw of this.towers) {
       if (tw.region !== reg.def.id) continue;
@@ -445,9 +451,10 @@ export class World {
       if (st.spec.catchPins && v.stages.length === 1 && !tw.caught && dxPad < 12) {
         const pinY = l.y + v.length * 0.86;
         const armY = tw.armH;
+        if ((globalThis as any).CATCHDBG && Math.abs(pinY - armY) < 4) console.log("catch?", dxPad.toFixed(2), (pinY - armY).toFixed(2), T.vVert.toFixed(2), T.vHoriz.toFixed(2), T.tilt.toFixed(1), l.x.toFixed(2), l.y.toFixed(1), l.z.toFixed(2), tw.key);
         if (Math.abs(pinY - armY) < 1.5 && l.y > p.top + 2) {
           const tilt = T.tilt, vv = T.vVert, hv = T.vHoriz;
-          if (dxPad < 3.5 && vv > -5 && hv < 2.5 && tilt < 7) {
+          if (dxPad < 4.5 && vv > -5 && hv < 2.5 && tilt < 7) {
             if (this.rng() < v.rel.catchSys) {
               this.emit('Vangarmen sluiten te laat — misgegrepen!', 'fail', v);
               tw.armOpen = 0.6;
@@ -471,6 +478,7 @@ export class World {
     const g = this.groundAt(reg, l.x, l.z, v);
     const groundY = this.surfaceY(reg, l, g.h);
     if (l.y > groundY + 0.05) return;
+    if (T.vVert > -0.3 && l.y > groundY - 2) { if (l.y < groundY) { const a = this.toWorld(reg.def.id, _v2.set(l.x, groundY, l.z)); v.pos.copy(a); } return; }
     // contact
     const vv = T.vVert, hv = T.vHoriz, tilt = T.tilt;
     const st = v.active;
