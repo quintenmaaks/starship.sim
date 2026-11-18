@@ -14,7 +14,7 @@ const steps = (process.env.STEPS || '').split(';').filter(Boolean);
 await new Promise((r) => setTimeout(r, +wait));
 for (const s of steps) { await page.evaluate(s); await new Promise((r) => setTimeout(r, +(process.env.STEPWAIT || 3000))); }
 await page.screenshot({ path: out, type: out.endsWith('.png') ? 'png' : 'jpeg', quality: out.endsWith('.png') ? undefined : 88 });
-const info = await page.evaluate(() => { const v = window.__view; return v ? { fps: v.fps, focusAlt: v.focus?.tel?.alt, t: window.__w?.t } : null; }).catch(() => null);
+const info = await page.evaluate(() => { const v = window.__view; return v ? { fps: v.fps, focusAlt: v.focus?.tel?.alt, t: window.__w?.t, cam: v.camera.position.toArray().map(Math.round), dir: v.camera.getWorldDirection(new window.THREE.Vector3()).toArray().map(x=>+x.toFixed(2)), wps: v.renderer.info.render.calls } : null; }).catch(() => null);
 console.log(JSON.stringify(info));
 console.log(logs.filter((l) => !l.includes('GPU stall') && !l.includes('GroupMarkerNotSet')).slice(0, 40).join('\n'));
 await browser.close();

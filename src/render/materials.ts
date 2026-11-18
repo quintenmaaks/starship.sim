@@ -12,7 +12,7 @@ export class Mats {
   constructor(env: THREE.Texture | null) {
     this.env = env;
     const st = steelTextures(24);
-    this.steel = new THREE.MeshStandardMaterial({ color: 0xd8dade, metalness: 1, roughness: 0.32, roughnessMap: st, envMap: env, envMapIntensity: 1.1 });
+    this.steel = new THREE.MeshStandardMaterial({ color: 0xc2c5ca, metalness: 1, roughness: 0.28, roughnessMap: st, envMap: env, envMapIntensity: 0.9 });
     const st2 = steelTextures(12);
     this.steelDark = new THREE.MeshStandardMaterial({ color: 0x8a8c90, metalness: 0.9, roughness: 0.5, roughnessMap: st2, envMap: env });
     const tt = tileTexture(); tt.repeat.set(6, 10);

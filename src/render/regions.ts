@@ -191,7 +191,7 @@ export class RegionView {
   makeVegetation(def: RegionDef, mats: Mats) {
     const g = new THREE.IcosahedronGeometry(1, 0);
     g.scale(1, 0.6, 1);
-    const m = new THREE.MeshStandardMaterial({ color: def.id === 'gulf' ? 0x4f5a2e : 0x2f4a25, roughness: 1, flatShading: true });
+    const m = new THREE.MeshStandardMaterial({ color: def.id === 'gulf' ? 0x7a7f4a : 0x4a6a3a, roughness: 1, flatShading: true });
     const N = this.qp.vegetation;
     const im = new THREE.InstancedMesh(g, m, N);
     const mt = new THREE.Matrix4(), q = new THREE.Quaternion(), s = new THREE.Vector3(), p = new THREE.Vector3();
@@ -204,7 +204,7 @@ export class RegionView {
       if (h < 0.9) continue;
       if (fbm(x / 300, z / 300, 3) < (def.id === 'gulf' ? 0.42 : 0.3)) continue;
       if (def.pads.some((pd) => Math.hypot(pd.x - x, pd.z - z) < 260)) continue;
-      const sc = 1 + hash2(tries, 8) * (def.id === 'gulf' ? 2.5 : 5);
+      const sc = 0.6 + hash2(tries, 8) * (def.id === 'gulf' ? 1.6 : 5);
       s.set(sc * (1 + hash2(tries, 2)), sc, sc * (1 + hash2(tries, 4)));
       q.setFromAxisAngle(new THREE.Vector3(0, 1, 0), hash2(tries, 6) * 6);
       p.set(x, this.y(x, z) + sc * 0.3, z);

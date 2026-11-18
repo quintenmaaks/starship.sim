@@ -1,0 +1,11 @@
+import puppeteer from 'puppeteer-core';
+import fs from 'fs';
+const [,, url, wait, file] = process.argv;
+const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
+const page = await browser.newPage();
+await page.setViewport({ width: 844, height: 390, deviceScaleFactor: 1 });
+page.on('pageerror', (e) => console.log('ERR', e.message));
+await page.goto(url, { waitUntil: 'load' });
+await new Promise((r) => setTimeout(r, +wait));
+console.log(await page.evaluate(fs.readFileSync(file, 'utf8')));
+await browser.close();

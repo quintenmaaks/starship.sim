@@ -128,8 +128,8 @@ export function plumeMaterial() {
         // methalox: blauw-paars nabij het mondstuk
         c += vec3(0.3, 0.35, 1.0) * smoothstep(0.12, 0.0, y) * 1.5;
         float edge = 1.0 - abs(vUv.x - 0.5) * 2.0;
-        float a = (1.0 - y) * (0.6 + 0.4 * edge) * uThr * mix(1.0, 0.35, uVac);
-        gl_FragColor = vec4(c * a, 1.0);
+        float a = (1.0 - y) * (0.6 + 0.4 * edge) * uThr * mix(1.0, 0.12, uVac);
+        gl_FragColor = vec4(c * a * 0.8, 1.0);
         #include <tonemapping_fragment>
         #include <colorspace_fragment>
       }`,

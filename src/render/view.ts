@@ -9,7 +9,7 @@ import { R_E, R_M } from '../sim/constants';
 import { Space } from './space';
 import { RegionView } from './regions';
 import { Mats } from './materials';
-import { envGradient } from './textures';
+import { envGradient, radialSprite } from './textures';
 import { buildStage, StageMesh } from './vehiclemesh';
 import { Particles, plumeMaterial, plumeGeometry, plasmaMaterial } from './fx';
 import { skyColorJS, sunTransmittance } from './atmo';
@@ -26,6 +26,7 @@ interface VView {
   v: Vehicle; group: THREE.Group; stages: StageMesh[]; nStages: number;
   plumes: { mesh: THREE.Mesh; mat: THREE.ShaderMaterial; st: number; ei: number }[];
   plumeMats: THREE.ShaderMaterial[];
+  clusters: { sprite: THREE.Sprite; big: THREE.Mesh; st: number; y: number }[];
   plasma: THREE.Mesh; vapor: THREE.Mesh; glow: THREE.PointLight; marker: THREE.Sprite;
   dead: boolean; deathT: number;
 }
@@ -58,6 +59,7 @@ export class View {
   canvas: HTMLCanvasElement;
   lost = false;
   flare = new Flare();
+  glowTex = radialSprite([[0, 'rgba(255,255,255,1)'], [0.2, 'rgba(255,220,170,0.8)'], [0.5, 'rgba(255,160,90,0.25)'], [1, 'rgba(255,140,60,0)']], 128);
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
     this.qp = currentPreset();
@@ -130,7 +132,7 @@ export class View {
   // ------------ Voertuigen ------------
   makeVView(v: Vehicle): VView {
     const group = new THREE.Group();
-    const vv: VView = { v, group, stages: [], nStages: 0, plumes: [], plumeMats: [], plasma: null as any, vapor: null as any, glow: null as any, marker: null as any, dead: false, deathT: 0 };
+    const vv: VView = { v, group, stages: [], nStages: 0, plumes: [], plumeMats: [], clusters: [], plasma: null as any, vapor: null as any, glow: null as any, marker: null as any, dead: false, deathT: 0 };
     this.buildVehicle(vv);
     this.scene.add(group);
     this.vviews.set(v, vv);
@@ -139,7 +141,7 @@ export class View {
   buildVehicle(vv: VView) {
     const g = vv.group;
     while (g.children.length) g.remove(g.children[0]);
-    vv.stages = []; vv.plumes = []; vv.plumeMats = [];
+    vv.stages = []; vv.plumes = []; vv.plumeMats = []; vv.clusters = [];
     const v = vv.v;
     let y = 0;
     const pg = plumeGeometry();
@@ -158,6 +160,12 @@ export class View {
         g.add(m);
         vv.plumes.push({ mesh: m, mat: pm, st: si, ei });
       });
+      // gezamenlijke gloed + grote pluim voor motorclusters
+      const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: 0xffb070, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false }));
+      sp.position.set(0, y - 2, 0); sp.visible = false; sp.renderOrder = 9; g.add(sp);
+      const bigMat = plumeMaterial();
+      const big = new THREE.Mesh(pg, bigMat); big.position.set(0, y - 1.5, 0); big.visible = false; big.renderOrder = 7; big.frustumCulled = false; g.add(big);
+      vv.clusters.push({ sprite: sp, big, st: si, y });
       y += st.spec.length;
     });
     vv.nStages = v.stages.length;
@@ -266,7 +274,13 @@ export class View {
       if (mode === 'chase' && v.tel.vSurf > 30 && v.state === 'flying') {
         // achter de vector aan
         const vd = v.vRel.clone().normalize();
-        const off = vd.clone().multiplyScalar(-1).applyAxisAngle(up, this.camYaw - 0.6).addScaledVector(up, this.camPitch * 0.8).normalize();
+        // achter de bewegingsrichting, maar nooit recht onder het voertuig (dan kijk je in de vlam)
+        const hz = vd.clone().addScaledVector(up, -vd.dot(up));
+        const hlen = hz.length();
+        const side = dirFrom(yaw, 0);
+        const back = hlen > 0.15 ? hz.normalize().multiplyScalar(-1).applyAxisAngle(up, (yaw - 0.6) * 0.5) : side;
+        const vert = -vd.dot(up);
+        const off = back.clone().multiplyScalar(1).addScaledVector(up, clamp(vert, -0.35, 0.25) + pitch * 0.8).normalize();
         pos.copy(target).addScaledVector(off, dist);
       } else pos.copy(target).addScaledVector(dirFrom(yaw, pitch), dist);
     } else if (mode === 'tower') {
@@ -342,7 +356,7 @@ export class View {
     this.frames++; this.fpsT += dt;
     if (this.fpsT > 0.5) { this.fps = this.frames / this.fpsT; this.frames = 0; this.fpsT = 0; }
     const w = this.world;
-    if (!w || !this.focus) { this.renderer.render(this.scene, this.camera); return; }
+    if (!w || !this.focus) { this.renderer.render(this.scene, this.camera); this.grabHook(); return; }
     this.updateCamera(dt);
     const o = this.origin;
     const ep = w.ephem;
@@ -371,6 +385,8 @@ export class View {
     const fog = this.scene.fog as THREE.FogExp2;
     fog.color.setRGB(Math.min(1, hor[0]), Math.min(1, hor[1]), Math.min(1, hor[2]));
     fog.density = camAlt < 100000 && this.focus.tel.body === 'earth' ? 0.000022 * Math.exp(-Math.max(0, camAlt) / 7000) : 0;
+    this.space.earthMat.uniforms.uFogCol.value.copy(fog.color);
+    this.space.earthMat.uniforms.uFogD.value = fog.density * 0.8;
     // ruimte
     const moonPos = ep.moonPos(w.t, new THREE.Vector3());
     this.space.update({ origin: o, camECI: this.camECI, camLocal: this.camera.position, sun, earthQ: ep.earthQuat(w.t, new THREE.Quaternion()), moonPos, moonQ: ep.moonQuat(w.t, new THREE.Quaternion()), t: w.t, skyBright: this.skyBright, pixelRatio: this.renderer.getPixelRatio() });
@@ -469,6 +485,7 @@ export class View {
         this.flare.render(this.renderer, sp.x, sp.y, vis * 0.9, this.camera.aspect);
       }
     }
+    this.grabHook();
   }
 
   updateVehicle(vv: VView, dt: number, sun: THREE.Vector3) {
@@ -483,7 +500,7 @@ export class View {
     const T = v.tel;
     // motoren en pluimen
     let flameTot = 0;
-    const plumeLenBase = (vac: boolean) => vac ? 60 : 30;
+    const plumeLenBase = (vac: boolean) => vac ? 70 : 55;
     const pAmb = T.pAmb / 101325;
     const vacK = clamp(1 - pAmb * 4, 0, 1);
     let ei = 0;
@@ -503,13 +520,29 @@ export class View {
       const thr = e.throttle * e.spool;
       flameTot += thr;
       const rex = vac ? 1.15 : 0.65;
-      const len = plumeLenBase(vac) * (0.45 + 0.55 * thr) * (1 + vacK * 3);
+      const len = plumeLenBase(vac) * (0.45 + 0.55 * thr) * (1 + vacK * 2.5) * (st.engines.length > 12 && !vac ? 1.6 : 1);
       p.mesh.scale.set(rex, len, rex);
       p.mat.uniforms.uThr.value = 0.6 + thr * 0.4;
       p.mat.uniforms.uVac.value = vacK;
       p.mat.uniforms.uTime.value = this.time;
     }
     void curOffset;
+    for (const c of vv.clusters) {
+      const st = v.stages[c.st];
+      let f = 0, nOn = 0, anyVac = false;
+      if (st) for (const e of st.engines) if (e.on && !e.failed) { f += e.throttle * e.spool; nOn++; if (e.spec.kind === 'vac') anyVac = true; }
+      const on = f > 0.05 && !map;
+      c.sprite.visible = on; c.big.visible = on && nOn >= 3;
+      if (!on) continue;
+      const D = st.spec.diameter;
+      const s = D * (1.4 + Math.sqrt(f) * 0.9) * (1 + vacK * 0.6);
+      c.sprite.scale.set(s, s, 1);
+      (c.sprite.material as THREE.SpriteMaterial).opacity = Math.min(1, 0.4 + f * 0.05) * (1 - vacK * 0.85);
+      const m = c.big.material as THREE.ShaderMaterial;
+      const L = (nOn > 12 ? 140 : 80) * (0.5 + 0.5 * f / nOn) * (1 + vacK * 2.5) * (anyVac && nOn <= 6 ? 1.3 : 1);
+      c.big.scale.set(D * 0.42 * (1 + vacK), L, D * 0.42 * (1 + vacK));
+      m.uniforms.uThr.value = 0.5 + 0.5 * Math.min(1, f / nOn); m.uniforms.uVac.value = vacK; m.uniforms.uTime.value = this.time;
+    }
     // klapvleugels / gridvinnen / poten
     for (const sm of vv.stages) {
       for (const f of sm.flaps) {
@@ -541,7 +574,7 @@ export class View {
     (vv.vapor.material as THREE.MeshBasicMaterial).opacity += (vap - (vv.vapor.material as THREE.MeshBasicMaterial).opacity) * Math.min(1, dt * 4);
     vv.vapor.visible = (vv.vapor.material as THREE.MeshBasicMaterial).opacity > 0.01 && !map;
     // licht van de vlam
-    vv.glow.intensity = flameTot > 0 ? Math.min(8e5, flameTot * 4e4) * (1 - vacK * 0.7) : 0;
+    vv.glow.intensity = flameTot > 0 ? Math.min(2.5e4, flameTot * 900) * (1 - vacK * 0.8) : 0;
     // rook en stoom
     if (flameTot > 0 && !map) this.emitExhaust(v, flameTot, vacK, dt);
     if (map) {
@@ -590,6 +623,10 @@ export class View {
     }
   }
 
+  grabHook() {
+    const W = window as any;
+    if (W.__grab) { W.__img = this.canvas.toDataURL('image/jpeg', 0.9); W.__grab = false; }
+  }
   // Screenshot (voor tests)
   snapshot() { return this.canvas.toDataURL('image/jpeg', 0.9); }
 }

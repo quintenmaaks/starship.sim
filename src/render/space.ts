@@ -29,7 +29,7 @@ export class Space {
       defines: { ES_: ES, EJ_: EJ },
       uniforms: {
         uDay: { value: day }, uNight: { value: night }, uClouds: { value: cloudT }, uSun: { value: new THREE.Vector3(1, 0, 0) },
-        uCamE: { value: new THREE.Vector3() }, uCloudRot: { value: 0 }, uQ: { value: quality },
+        uCamE: { value: new THREE.Vector3() }, uCloudRot: { value: 0 }, uQ: { value: quality }, uFogCol: { value: new THREE.Color() }, uFogD: { value: 0 },
       },
       vertexShader: LOGV + `
         varying vec2 vUv; varying vec3 vN; varying vec3 vWE; 
@@ -38,7 +38,7 @@ export class Space {
           #include <logdepthbuf_vertex>
         }`,
       fragmentShader: LOGF + ATMO_GLSL + `
-        uniform sampler2D uDay; uniform sampler2D uNight; uniform sampler2D uClouds; uniform vec3 uSun; uniform vec3 uCamE; uniform float uCloudRot; uniform float uQ;
+        uniform sampler2D uDay; uniform sampler2D uNight; uniform sampler2D uClouds; uniform vec3 uSun; uniform vec3 uCamE; uniform float uCloudRot; uniform float uQ; uniform vec3 uFogCol; uniform float uFogD;
         varying vec2 vUv; varying vec3 vN; varying vec3 vWE;
         void main(){
           #include <logdepthbuf_fragment>
@@ -64,6 +64,9 @@ export class Space {
           float tMax = length(pE - uCamE);
           vec3 ins = atmosphere(uCamE, viewDir, uSun, tMax, ES_, EJ_, trans);
           col = col * trans + ins;
+          // aansluiten op de lokale mist van het terrein
+          float fk = 1.0 - exp(-tMax * 1000.0 * uFogD);
+          col = mix(col, uFogCol, fk);
           gl_FragColor = vec4(col, 1.0);
           #include <tonemapping_fragment>
           #include <colorspace_fragment>
@@ -116,7 +119,7 @@ export class Space {
     this.atmoMat = new THREE.ShaderMaterial({
       transparent: true, depthWrite: false, side: THREE.BackSide,
       blending: THREE.CustomBlending, blendSrc: THREE.OneFactor, blendDst: THREE.OneMinusSrcAlphaFactor,
-      defines: { AS_: AS, AJ_: AJ },
+      defines: { AS_: AS, AJ_: AJ, RGND: '6368.0' },
       uniforms: { uSun: { value: new THREE.Vector3(1, 0, 0) }, uCamE: { value: new THREE.Vector3() }, uQ: { value: quality } },
       vertexShader: LOGV + `varying vec3 vWE; void main(){ vWE = mat3(modelMatrix)*position; gl_Position = projectionMatrix*modelViewMatrix*vec4(position,1.0);
         #include <logdepthbuf_vertex>
@@ -129,7 +132,7 @@ export class Space {
           vec3 c = atmosphere(uCamE, rd, uSun, 1e9, AS_, AJ_, trans);
           // zonneschijf
           float sd = dot(rd, uSun);
-          vec2 pg = rsi(uCamE, rd, RP);
+          vec2 pg = rsi(uCamE, rd, RGND);
           bool hitGround = pg.x < pg.y && pg.x > 0.0;
           if (!hitGround) c += vec3(14.0, 13.0, 12.0) * trans * smoothstep(0.99996, 0.99999, sd);
           float a = 1.0 - (trans.r + trans.g + trans.b) / 3.0;

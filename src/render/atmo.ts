@@ -7,6 +7,9 @@ const float BM = 21e-3;
 const float HR = 8.0;
 const float HM = 1.2;
 const float GM = 0.76;
+#ifndef RGND
+#define RGND RP
+#endif
 vec2 rsi(vec3 r0, vec3 rd, float sr) {
   float a = dot(rd, rd); float b = 2.0 * dot(rd, r0); float c = dot(r0, r0) - (sr * sr);
   float d = (b*b) - 4.0*a*c;
@@ -20,7 +23,7 @@ vec3 atmosphere(vec3 r0, vec3 r, vec3 pSun, float tMax, int iSteps, int jSteps, 
   trans = vec3(1.0);
   if (p.x > p.y) return vec3(0.0);
   p.y = min(p.y, tMax);
-  vec2 pg = rsi(r0, r, RP);
+  vec2 pg = rsi(r0, r, RGND);
   if (pg.x < pg.y && pg.x > 0.0) p.y = min(p.y, pg.x);
   p.x = max(p.x, 0.0);
   if (p.y <= p.x) return vec3(0.0);
