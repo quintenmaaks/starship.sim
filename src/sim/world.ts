@@ -345,7 +345,7 @@ export class World {
     this.heating(v, vr, dt, uBody);
     // ---- belastingen ----
     this.loads(v, qdyn, dt);
-    if (v.state === 'destroyed') { this.emit('', 'explode', v); return undefined; }
+    if ((v.state as string) === 'destroyed') { this.emit('', 'explode', v); return undefined; }
     // sonische knal
     const prevM = (v as any)._prevMach || 0;
     if (prevM > 1 && T.mach <= 1 && T.alt < 20000 && v.tel.vVert < 0) this.emit('Sonische knal', 'boom', v);
