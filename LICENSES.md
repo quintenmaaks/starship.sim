@@ -5,4 +5,4 @@
 - `public/tex/moon.jpg`, `public/tex/moon_height.jpg` — NASA Scientific Visualization Studio, CGI Moon Kit (LRO LROC/LOLA). Public domain.
 - All other textures (clouds, terrain, steel, tiles, stars, etc.) are generated procedurally at runtime.
 - Three.js — MIT License.
-- Starship-klasse is a fictional, generic vehicle inspired by real-world fully reusable rocket designs. No official names, logos or trademarks are used.
+- This is a personal, non-commercial fan game. SpaceX, Starship, Super Heavy, Raptor, Starbase, Starlink and related names are trademarks of Space Exploration Technologies Corp.; they are used here descriptively only. No official logo image files are included; the in-game wordmark is self-made text styling.
