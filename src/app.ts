@@ -22,7 +22,7 @@ export class App {
   g: GameState | null = null;
   backdrop: World | null = null; backdropDesign = '';
   raf = 0; last = 0; inFlight = false;
-  screenEl: HTMLElement | null = null;
+  screenEl: HTMLElement | null = null; fpsEl: HTMLElement | null = null;
   constructor(view: View) {
     this.view = view;
     this.ui = document.getElementById('ui')!;
@@ -62,6 +62,7 @@ export class App {
     const dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
     if (this.backdrop && this.view.world === this.backdrop) { this.backdrop.t += dt * 2; this.backdrop.updateFrames(); for (const v of this.backdrop.vehicles) this.backdrop.applyAnchor(v); }
     this.view.render(dt);
+    if (settings.fps) { if (!this.fpsEl) { this.fpsEl = h('div', 'fps', ''); document.body.append(this.fpsEl); } this.fpsEl.style.display = ''; this.fpsEl.textContent = this.view.fps.toFixed(0) + ' fps'; } else if (this.fpsEl) this.fpsEl.style.display = 'none';
   }
   // ---------- schermen ----------
   setScreen(el: HTMLElement) {
@@ -76,7 +77,7 @@ export class App {
 
   // ---------- vlucht ----------
   fly(setup: FlightSetup, ctx: FlightCtx, after: (r: FlightResult, rw: Reward) => void, restart?: () => void) {
-    this.stopLoop();
+    this.stopLoop(); if (this.fpsEl) this.fpsEl.style.display = 'none';
     this.screenEl?.remove(); this.screenEl = null;
     this.inFlight = true;
     audio.setMusic(false);

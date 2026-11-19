@@ -181,6 +181,14 @@ export class View {
     const vc = new THREE.Mesh(new THREE.ConeGeometry(R * 2.2, L * 0.3, 32, 1, true), new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0, depthWrite: false, side: THREE.DoubleSide, fog: false }));
     vc.position.y = L * 0.55; vc.rotation.x = Math.PI; g.add(vc); vv.vapor = vc;
     const gl = new THREE.PointLight(0xffaa66, 0, 600, 1.6); gl.position.y = -10; g.add(gl); vv.glow = gl;
+    // HLS-landingsthrusters (hoog op de romp)
+    if (v.stages.some((st) => st.spec.name.toLowerCase().includes('hls') || (st.spec.kind === 'ship' && !st.spec.flaps && st.spec.heatShield === 0 && st.spec.legs && st.spec.length > 40))) {
+      const jets = new THREE.Group(); const jg = new THREE.ConeGeometry(1.1, 14, 16, 1, true); jg.translate(0, -7, 0);
+      const jm = new THREE.MeshBasicMaterial({ color: 0xfff1d8, transparent: true, opacity: 0.55, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false });
+      for (let i = 0; i < 6; i++) { const a = i / 6 * Math.PI * 2; const j = new THREE.Mesh(jg, jm); j.position.set(Math.cos(a) * (R + 0.4), L * 0.68, Math.sin(a) * (R + 0.4)); j.rotation.set(Math.sin(a) * -0.35, 0, Math.cos(a) * 0.35); jets.add(j);
+        const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: 0xffd9a0, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, fog: false })); sp.scale.setScalar(5); sp.position.copy(j.position); jets.add(sp); }
+      jets.visible = false; g.add(jets); (vv as any).hlsJets = jets;
+    }
     const mk = new THREE.Sprite(new THREE.SpriteMaterial({ color: v.role === 'booster' ? 0x66ccff : 0xffcc55, depthTest: false, sizeAttenuation: false, transparent: true }));
     mk.scale.set(0.02, 0.02, 1); mk.visible = false; mk.renderOrder = 50; g.add(mk); vv.marker = mk;
     g.traverse((o) => { if ((o as THREE.Mesh).isMesh && !(o as any).material?.transparent && (o as any).material?.type !== 'ShaderMaterial') { o.castShadow = true; o.receiveShadow = true; } });
@@ -590,6 +598,8 @@ export class View {
     (vv.vapor.material as THREE.MeshBasicMaterial).opacity += (vap - (vv.vapor.material as THREE.MeshBasicMaterial).opacity) * Math.min(1, dt * 4);
     vv.vapor.visible = (vv.vapor.material as THREE.MeshBasicMaterial).opacity > 0.01 && !map;
     // licht van de vlam
+    const hj = (vv as any).hlsJets as THREE.Group | undefined;
+    if (hj) { const lt = (v.ap as any)?.landThrust || 0; const on = lt > 0 && (v.ap as any)?.phase === 'Landingsmotoren' && !map; hj.visible = on; if (on) { const k = 0.7 + 0.3 * Math.sin(this.time * 40); hj.children.forEach((c, i) => { if (i % 2 === 0) c.scale.set(1, k * (0.8 + Math.min(1, lt / 1.2e6)), 1); }); flameTot += 2; } }
     vv.glow.intensity = flameTot > 0 ? Math.min(2.5e4, flameTot * 900) * (1 - vacK * 0.8) : 0;
     // rook en stoom
     if (flameTot > 0 && !map) this.emitExhaust(v, flameTot, vacK, dt);
