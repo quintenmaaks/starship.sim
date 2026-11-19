@@ -425,7 +425,8 @@ export class View {
     sl.position.copy(this.focus.pos).sub(o).addScaledVector(sun, 5000);
     sl.target.position.copy(this.focus.pos).sub(o);
     sl.castShadow = this.qp.shadows && camAlt < 60000;
-    // voertuigen
+    // voertuigen (verwijderde voertuigen opruimen)
+    if (this.vviews.size > w.vehicles.length) for (const [v, vv] of this.vviews) if (!w.vehicles.includes(v)) { this.scene.remove(vv.group); this.vviews.delete(v); }
     for (const v of w.vehicles) {
       let vv = this.vviews.get(v);
       if (!vv) { if (v.state === 'destroyed') continue; vv = this.makeVView(v); }

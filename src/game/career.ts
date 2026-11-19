@@ -2,6 +2,7 @@
 import { GameState, Build, findDesign, allDesigns, globalRecords, saveRecords, saveGame } from './state';
 import { MissionDef, MISSIONS, MISSION_BY_ID } from './missions';
 import { Design } from './parts';
+import { RESEARCH_BY_ID } from './research';
 import { Prep, reliabilityFor, missionCost, refurbCost, buildDays, addMoney, news, stockShock, advanceDays, grantMilestone, grantAchievement, certified, padRecoveryDays, heritageOf } from './economy';
 import { clamp, money } from '../core/util';
 import type { FlightResult } from '../flight/controller';
@@ -10,7 +11,7 @@ export interface Lock { ok: boolean; why: string[] }
 export function missionLock(g: GameState | null, m: MissionDef): Lock {
   const why: string[] = [];
   if (!g || g.mode === 'sandbox') return { ok: true, why };
-  for (const r of m.needs) if (!g.research[r]) why.push('Onderzoek nodig: ' + r);
+  for (const r of m.needs) if (!g.research[r]) why.push('Onderzoek nodig: ' + (RESEARCH_BY_ID[r]?.name || r));
   for (const t of m.needsTests || []) if (!(g.tests[t]?.ok > 0)) why.push('Eerst geslaagd: ' + (MISSION_BY_ID[t]?.title || t));
   if (m.crew && g.team.pilots < 4) why.push('Minimaal 4 astronauten in dienst');
   if (m.id === 'crewlunar' && !certified(g)) why.push('Certificering voor bemande maanvluchten vereist');
