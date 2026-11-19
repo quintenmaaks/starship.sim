@@ -253,7 +253,10 @@ export class View2D {
     const w = this.world!;
     const q = body === 'earth' ? w.ephem.earthQuat(w.t, new THREE.Quaternion()) : w.ephem.moonQuat(w.t, new THREE.Quaternion());
     const sb = body === 'earth' ? this.sphere : this.moonSphere;
-    const img = sb.render(body, BW, BH, cx / k, cy / k, rp / k, this.tan, this.up, this.nrm, q, this.sun, w.t * 2e-6, atmo);
+    const sbx = sb as any; const key = `${(cx / k) | 0},${(cy / k) | 0},${(rp / k).toFixed(1)},${BW | 0}`;
+    let img: HTMLCanvasElement;
+    if (sbx._key === key && this.time - sbx._t < 0.08) img = sb.c;
+    else { img = sb.render(body, BW, BH, cx / k, cy / k, rp / k, this.tan, this.up, this.nrm, q, this.sun, w.t * 2e-6, atmo); sbx._key = key; sbx._t = this.time; }
     x.imageSmoothingEnabled = true;
     x.drawImage(img, 0, 0, this.W, this.H);
     if (atmo && rp < 2e5) {
@@ -421,6 +424,7 @@ export class View2D {
     const k = this.s / PPM;
     // plasma achter het voertuig (eerst)
     const hf = T.heatFlux || 0; const pl = clamp((hf - 8e4) / 6e5, 0, 1.5);
+    if (pl > 0.01) { x.restore(); this.drawPlasma(v, px, py, pl, 0); x.save(); x.translate(px, py); x.rotate(ang); }
     // trappen
     let off = 0;
     const flapsAng = v.flapsOn && T.q > 50 ? 1 : 0;
@@ -453,7 +457,11 @@ export class View2D {
     // vlammen (additief)
     if (flames.length) {
       x.globalCompositeOperation = 'lighter';
-      for (const [yo, bx, thr, vac, D, nOn] of flames) this.drawFlame(bx, -yo, thr, vac, D, nOn, vacK, v);
+      // vlam stopt op de grond/het lanceerplatform (plus gloed op het raakpunt)
+      const upDot = Math.max(0.2, v.nose(_c).dot(this.up));
+      const gnd = T.agl < 300 ? (Math.max(0, T.agl) + 1) / upDot : 1e9;
+      for (const [yo, bx, thr, vac, D, nOn] of flames) this.drawFlame(bx, -yo, thr, vac, D, nOn, vacK, v, gnd);
+      if (gnd < 200) { const gs2 = glowSprite(); const rr = (v.diameter * 2.5 + 10) * this.s; x.globalAlpha = 0.8; x.drawImage(gs2, -rr, gnd * this.s - rr * 0.6, rr * 2, rr * 1.2); x.globalAlpha = 1; }
       // gloed
       const gs = glowSprite(); const gr = (v.diameter * 3 + 25 * (1 - vacK)) * this.s;
       x.globalAlpha = 0.55 * (1 - vacK * 0.6); x.drawImage(gs, -gr, -gr + 2 * this.s, gr * 2, gr * 2); x.globalAlpha = 1;
@@ -474,7 +482,7 @@ export class View2D {
     }
     x.restore();
     // plasma bij terugkeer
-    if (pl > 0.01) this.drawPlasma(v, px, py, pl);
+    if (pl > 0.01) this.drawPlasma(v, px, py, pl, 1);
     // condensatiewolk rond Mach 1
     const vap = T.mach > 0.85 && T.mach < 1.35 && T.alt < 16000 ? Math.sin((T.mach - 0.85) / 0.5 * Math.PI) * 0.45 : 0;
     if (vap > 0.02) {
@@ -485,7 +493,7 @@ export class View2D {
       x.fillStyle = g; x.beginPath(); x.ellipse(0, yy, rr, rr * 1.6, 0, 0, Math.PI * 2); x.fill(); x.restore();
     }
   }
-  drawFlame(bx: number, y0: number, thr: number, vac: boolean, D: number, nOn: number, vacK: number, v: Vehicle) {
+  drawFlame(bx: number, y0: number, thr: number, vac: boolean, D: number, nOn: number, vacK: number, v: Vehicle, maxLen = 1e9) {
     const x = this.x, s = this.s;
     const cluster = nOn > 1;
     const bellL = vac ? 3.6 : 2.3;
@@ -494,6 +502,7 @@ export class View2D {
     let len = (vac ? 70 : 55) * (0.45 + 0.55 * thr) * (1 + vacK * 2.5) * flick;
     let wid = (vac ? 2.3 : 1.3) * (1 + vacK * 1.8);
     if (cluster) { len = 140 * (0.5 + 0.5 * thr) * (1 + vacK * 2.5) * flick; wid = D * 0.85 * (1 + vacK * 1.2); }
+    len = Math.min(len, Math.max(3, maxLen - bellL - y0));
     const L = len * s, Wd = wid * s, cx = bx * s;
     // buitenste pluim: oranje-geel op zeeniveau, blauw-violet en wijd in vacuüm
     const g = x.createLinearGradient(0, ey, 0, ey + L);
@@ -520,18 +529,30 @@ export class View2D {
     }
     void v;
   }
-  drawPlasma(v: Vehicle, px: number, py: number, pl: number) {
+  // plasma bij terugkeer: staart achter het voertuig (part 0) en boeggloed op de aanstroomzijde (part 1)
+  drawPlasma(v: Vehicle, px: number, py: number, pl: number, part: 0 | 1) {
     const x = this.x, s = this.s;
     const vr = v.vRel; const wx = vr.dot(this.tan), wy = vr.dot(this.up);
-    const a = Math.atan2(wx, wy); // richting van beweging (scherm)
-    const nose = v.nose(_a); const midx = px + nose.dot(this.tan) * v.length * 0.5 * s, midy = py - nose.dot(this.up) * v.length * 0.5 * s;
+    const a = Math.atan2(wx, wy);
+    const nose = v.nose(_a); const ba = Math.atan2(nose.dot(this.tan), nose.dot(this.up));
+    const midx = px + Math.sin(ba) * v.length * 0.5 * s, midy = py - Math.cos(ba) * v.length * 0.5 * s;
+    const wd = (Math.abs(v.length * Math.sin(ba - a)) + v.diameter) * s;
+    const k = Math.min(1, pl); const fl = 0.85 + Math.random() * 0.3;
     x.save(); x.translate(midx, midy); x.rotate(a); x.globalCompositeOperation = 'lighter';
-    const len = v.length * s, wd = Math.max(v.diameter, v.length * Math.abs(Math.sin(Math.atan2(nose.dot(this.tan), nose.dot(this.up)) - a))) * s;
-    const fl = 0.85 + Math.random() * 0.3;
-    const g = x.createLinearGradient(0, -wd * 0.6, 0, len * 2.5 * fl);
-    g.addColorStop(0, `rgba(255,190,240,${0.0})`); g.addColorStop(0.08, `rgba(255,170,220,${0.75 * Math.min(1, pl)})`); g.addColorStop(0.2, `rgba(255,120,80,${0.5 * Math.min(1, pl)})`); g.addColorStop(1, 'rgba(255,80,40,0)');
-    x.fillStyle = g;
-    x.beginPath(); x.moveTo(-wd * 0.7, -wd * 0.25); x.quadraticCurveTo(0, -wd * 0.9, wd * 0.7, -wd * 0.25); x.lineTo(wd * 0.2, len * 2.5 * fl); x.lineTo(-wd * 0.2, len * 2.5 * fl); x.closePath(); x.fill();
+    if (part === 0) {
+      const len = (wd * 0.8 + v.length * s * 0.4) * fl;
+      const g = x.createLinearGradient(0, 0, 0, len);
+      g.addColorStop(0, `rgba(255,150,90,${0.38 * k})`); g.addColorStop(0.4, `rgba(220,90,150,${0.16 * k})`); g.addColorStop(1, 'rgba(120,60,200,0)');
+      x.fillStyle = g;
+      x.beginPath(); x.moveTo(-wd * 0.52, -wd * 0.02); x.bezierCurveTo(-wd * 0.5, len * 0.3, -wd * 0.12, len * 0.7, 0, len); x.bezierCurveTo(wd * 0.12, len * 0.7, wd * 0.5, len * 0.3, wd * 0.52, -wd * 0.02); x.closePath(); x.fill();
+    } else {
+      const g = x.createRadialGradient(0, -wd * 0.08, 0, 0, -wd * 0.08, wd * 0.55);
+      g.addColorStop(0, `rgba(255,235,245,${0.4 * k})`); g.addColorStop(0.5, `rgba(255,130,190,${0.22 * k})`); g.addColorStop(1, 'rgba(255,90,150,0)');
+      x.fillStyle = g; x.beginPath(); x.ellipse(0, -wd * 0.08, wd * 0.55, wd * 0.16, 0, 0, Math.PI * 2); x.fill();
+      // boeggolf
+      x.strokeStyle = `rgba(255,170,215,${0.55 * k})`; x.lineWidth = Math.max(1.5, wd * 0.025);
+      x.beginPath(); x.moveTo(-wd * 0.6, wd * 0.12); x.quadraticCurveTo(0, -wd * 0.36 * fl, wd * 0.6, wd * 0.12); x.stroke();
+    }
     x.globalCompositeOperation = 'source-over'; x.restore();
   }
   emitExhaust(v: Vehicle, flame: number, vacK: number, dt: number) {
@@ -548,7 +569,7 @@ export class View2D {
         this.emit(gp.clone().addScaledVector(this.tan, sd * (6 + Math.random() * 8)).addScaledVector(this.up, 3), sv.clone().addScaledVector(this.tan, sd * sp).addScaledVector(this.up, 4 + Math.random() * 10), 5 + Math.random() * 5, 10, 45 + Math.random() * 35, 0.55, 0, 0.6);
       }
     }
-    if (T.alt < 50000 && T.body === 'earth') {
+    if (T.alt < 50000 && T.agl > 70 && T.body === 'earth') {
       const thin = clamp(1 - T.alt / 50000, 0, 1);
       const n = Math.min(3, Math.floor(Math.min(1, flame / 3) * 1.5 * k) + 1);
       for (let i = 0; i < n; i++) {
