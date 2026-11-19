@@ -388,9 +388,11 @@ export class BoostbackProgram extends Program {
 }
 
 // ===== SCHIP TERUGKEER (buiklanding + flip) =====
+export let RANGE_BIAS = 214000;
+export function setRangeBias(b: number) { RANGE_BIAS = b; }
 export class ShipReturnProgram extends Program {
   tgt: LandTarget | null; lg: LandingGuidance | null = null; flipped = false;
-  alpha = 70;
+  alpha = 70; rangeErr = 0; bank = 0;
   constructor(v: Vehicle, tgt: LandTarget | null) { super(v); this.tgt = tgt; if (tgt) this.lg = new LandingGuidance(v, tgt, 20); this.phase = 'Kust'; }
   update(dt: number, w: World) {
     const v = this.v;
@@ -447,6 +449,23 @@ export class ShipReturnProgram extends Program {
     let alpha = T.mach > 3 ? 68 : T.mach > 1 ? 75 : 88;
     if (T.alt > ATMO_TOP) alpha = 65;
     let bankOff = new THREE.Vector3();
+    if (this.tgt && T.alt < 125000 && T.alt > 8000) {
+      // bereikregeling: lagere invalshoek = verder glijden, hogere = korter
+      const pr = predictImpact(w, v, (1.15 + (alpha - 70) * 0.012) * v.length * 9, this.tgt.region, 2400);
+      const ls = localState(w, v, this.tgt.region);
+      const hv = new THREE.Vector3(ls.vel.x, 0, ls.vel.z);
+      if (hv.lengthSq() > 1) {
+        hv.normalize();
+        const along = (this.tgt.x - pr.local.x) * hv.x + (this.tgt.z - pr.local.z) * hv.z - RANGE_BIAS * clamp((T.vSurf - 400) / 2000, 0, 1);
+        this.rangeErr = along;
+        const k = clamp(along / 150000, -1, 1);
+        if (T.mach > 1.5) alpha = clamp(alpha - k * 18, 50, 85);
+        // dwarsfout → rolhoek (lift opzij kantelen)
+        const cross = -(this.tgt.x - pr.local.x) * hv.z + (this.tgt.z - pr.local.z) * hv.x;
+        this.bank = clamp(cross / 60000, -1, 1) * 45 * Math.PI / 180;
+      }
+    }
+    else this.bank = 0;
     if (this.tgt && T.alt < 60000) {
       // stuur naar doel via kleine glijhoek
       const pr = predictImpact(w, v, 1.15 * v.length * 9, this.tgt.region, 1200);
@@ -458,11 +477,23 @@ export class ShipReturnProgram extends Program {
     const hperp = up.clone().sub(vsn.clone().multiplyScalar(up.dot(vsn)));
     if (hperp.lengthSq() < 1e-6) hperp.set(1, 0, 0);
     hperp.normalize();
+    if (this.bank) hperp.applyAxisAngle(vsn, this.bank);
     const a = alpha * Math.PI / 180;
     const nose = vsn.clone().multiplyScalar(Math.cos(a)).add(hperp.clone().multiplyScalar(Math.sin(a))).add(bankOff).normalize();
     const belly = vsn.clone().multiplyScalar(Math.sin(a)).sub(hperp.clone().multiplyScalar(Math.cos(a)));
     point(v, nose, belly);
     v.flapsOn = true;
+    // subsonische buikglijvlucht: flaps sturen horizontale snelheid naar het doel (L/D ~0,25)
+    if (this.tgt && T.mach < 0.9 && T.alt < 18000 && v.active.flapHealth > 0.4) {
+      const ls = localState(w, v, this.tgt.region);
+      const hh = ls.p.y - this.tgt.y;
+      const ex = this.tgt.x - ls.p.x, ez = this.tgt.z - ls.p.z;
+      const tgo = Math.max(5, hh / Math.max(-ls.vel.y, 10));
+      let dx = ex / tgo, dz = ez / tgo; const dm = Math.hypot(dx, dz); if (dm > 30) { dx *= 30 / dm; dz *= 30 / dm; }
+      let cx = (dx - ls.vel.x) * 0.8, cz = (dz - ls.vel.z) * 0.8; const cm = Math.hypot(cx, cz); const lim = 2.5;
+      if (cm > lim) { cx *= lim / cm; cz *= lim / cm; }
+      v.vel.addScaledVector(new THREE.Vector3(cx, 0, cz).applyQuaternion(ls.quat), dt);
+    }
     this.phase = T.alt > ATMO_TOP ? 'Terugkeerhouding' : T.mach > 1 ? 'Terugkeer (plasma)' : 'Buiklanding (belly flop)';
   }
   busy() { return !this.done && (this.v.tel.alt < ATMO_TOP + 20000); }

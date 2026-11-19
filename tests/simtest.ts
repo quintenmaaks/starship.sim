@@ -6,6 +6,7 @@ import { BUILTIN_DESIGNS, designToSpec, designStats } from '../src/game/parts';
 import { AscentProgram, BoostbackProgram, HopProgram, ShipReturnProgram } from '../src/sim/autopilot';
 import * as AP from '../src/sim/autopilot';
 import { REGIONS } from '../src/sim/terrain';
+import { placeEntry } from '../src/sim/spawn';
 
 function run(name: string, setup: (w: World) => any, maxT: number) {
   const e = new Ephemeris(0); e.setLocalHour(-97.157, 10);
@@ -78,4 +79,16 @@ if (which === 'ift') {
     w.on((e) => { if (e.kind === 'seco') { setTimeout(()=>{},0); } });
     (w as any)._v = v;
   }, 4200);
+}
+
+if (which === 'shipcatch') {
+  const D = Number(process.env.D || 2300e3), G = Number(process.env.G || -1.2), VV = Number(process.env.V || 7400), AZ = Number(process.env.AZ || 90);
+  run('shipcatch', (w) => {
+    const pad = REGIONS.gulf.pads.find((p) => p.id === 'olm')!;
+    const spec = designToSpec(BUILTIN_DESIGNS[3]);
+    const v = w.spawnOnPad({ name: 'S', stages: [spec.stages[1]] }, 'ship', 'gulf', 'olm', 0, [0.06]);
+    w.anchors.delete(v); v.state = 'flying';
+    placeEntry(w, v, 'gulf', pad.x, pad.z, D, G, VV, AZ);
+    v.ap = new ShipReturnProgram(v, { region: 'gulf', pad, x: pad.x, z: pad.z, y: pad.top + 12, catchTower: true });
+  }, 3000);
 }
