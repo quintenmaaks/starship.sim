@@ -648,7 +648,7 @@ export class BurnProgram extends Program {
     this.started = true;
     v.selectEngines(this.engines === 'all' ? 'all' : this.engines);
     const thr = clamp(this.dvLeft / 15, 0.05, 1);
-    v.cmdThrottle = Math.max(thr, 0.4);
+    v.cmdThrottle = Math.min(Math.max(thr, 0.4), 3.2 * G0 * v.mass / Math.max(F / 0.95, 1));
     const a = v.accel.dot(this.dir);
     this.dvLeft -= Math.max(0, a) * dt;
     this.phase = `${this.label}: brand (${this.dvLeft.toFixed(0)} m/s)`;

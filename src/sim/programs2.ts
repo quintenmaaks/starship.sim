@@ -271,7 +271,7 @@ export class TliBurnProgram extends Program {
     const el = elements(v.pos, v.vel, MU_E, 6371000);
     const apo = el.e < 1 ? el.apo : 1e12;
     const left = this.node.apo - apo;
-    v.cmdThrottle = left > 30e6 ? 1 : clamp(left / 30e6, 0.4, 1);
+    v.cmdThrottle = Math.min(left > 30e6 ? 1 : clamp(left / 30e6, 0.4, 1), 3.2 * G0 * v.mass / Math.max(F, 1));
     this.phase = 'TLI-brand';
     this.status = `Apogeum ${(Math.max(0, apo) / 1000).toFixed(0)} / ${(this.node.apo / 1000).toFixed(0)} km`;
     if (apo >= this.node.apo || v.active.prop <= 0) { v.cmdThrottle = 0; this.done = true; w.emit('TLI voltooid — op weg naar de Maan', 'seco', v); }
