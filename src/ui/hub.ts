@@ -30,7 +30,7 @@ export function showHub(app: App, tab?: string) {
   // achtergrond: het meest geavanceerde voertuig op het platform
   const ready = g.builds.filter((b) => b.ready);
   const showD = findDesign(g, (ready[ready.length - 1] || g.builds[g.builds.length - 1])?.designId || 'hopper');
-  app.setBackdrop(showD, 17.9);
+  app.setBackdrop(showD, 16.4);
 
   const topbar = h('div', 'topbar glass');
   const tabs = h('div', 'tabs');
@@ -156,7 +156,7 @@ export function prepDialog(app: App, m: MissionDef) {
       h('div', 'lbl', { style: { marginTop: '6px' } } as any, 'Voorbereiding'),
       segs([['rush', '⚡ Haasten'], ['normal', 'Standaard'], ['thorough', '🧯 Extra testen']], prep, (v) => (prep = v)),
       h('div', 'dim', { style: { fontSize: '10.5px' } } as any, prep === 'rush' ? 'Sneller en goedkoper, maar veel meer kans op storingen. Moraal daalt.' : prep === 'thorough' ? 'Langer en duurder, maar veel betrouwbaarder.' : 'Normale procedures.'),
-      m.noFlight ? null : h('div', null, h('div', 'lbl', { style: { marginTop: '6px' } } as any, 'Lanceervenster'), segs([[9, 'Ochtend'], [13, 'Middag'], [18.7, 'Zonsondergang'], [23, 'Nacht']], hour, (v) => (hour = v))),
+      m.noFlight ? null : h('div', null, h('div', 'lbl', { style: { marginTop: '6px' } } as any, 'Lanceervenster'), segs([[9, 'Ochtend'], [13, 'Middag'], [16.9, 'Zonsondergang'], [23, 'Nacht']], hour, (v) => (hour = v))),
       contracts.length ? h('div', null, h('div', 'lbl', { style: { marginTop: '6px' } } as any, 'Contract'), segs([[undefined, 'Geen'], ...contracts.map((c) => [c.id, `${c.title} (+${money(c.pay)})`] as [any, string])], contractId, (v) => (contractId = v))) : null,
       h('div', { style: { display: 'grid', gridTemplateColumns: '1fr 1fr', columnGap: '14px', marginTop: '8px' } } as any,
         h('div', null,

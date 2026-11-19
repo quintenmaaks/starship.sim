@@ -15,7 +15,7 @@ export interface QuickOpts { hour?: number; wind?: number; relMode?: RelMode; ba
 export function quickFly(app: App, m: MissionDef, design: Design, o: QuickOpts) {
   const prep: Prep = o.relMode === 'rush' ? 'rush' : 'normal';
   const rel = o.relMode === 'perfect' || !o.relMode ? PERFECT : reliabilityFor(null, design, prep).rel;
-  const hour = o.hour ?? (m.id === 'sc_night' ? 23.5 : 16.5);
+  const hour = o.hour ?? (m.id === 'sc_night' ? 23.5 : 15.5);
   const run = () => {
     const setup = new FlightSetup({ mission: m, design, rel, hour, wind: o.wind, sandbox: true });
     const ctx: FlightCtx = { mission: m, design, build: null, prep, relScore: 1, hour };
@@ -39,7 +39,7 @@ export function dailyChallenge(): Daily {
     { mission: MISSION_BY_ID.sc_ift5, title: 'IFT-dag', goal: 'Volledige vlucht met boostervangst', check: (x) => !!x.metrics.boosterCatch },
   ];
   const p = pool[Math.floor(r() * pool.length)];
-  const hours = [7, 12, 17.8, 19.2, 22.5];
+  const hours = [8, 12, 15.5, 16.9, 22.5];
   return { ...p, key, design: findDesign(null, p.mission.designs[0]), hour: hours[Math.floor(r() * hours.length)], wind: 3 + r() * 12 };
 }
 export function dailyState() {

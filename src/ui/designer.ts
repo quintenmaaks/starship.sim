@@ -15,7 +15,7 @@ export function showDesigner(app: App, g: GameState | null, back: () => void, st
   const designs = () => allDesigns(g);
   let d: Design = clone(designs().find((x) => x.id === startId) || designs().find((x) => x.id === 'v2') || BUILTIN_DESIGNS[0]);
   let previewTimer = 0;
-  const preview = () => { clearTimeout(previewTimer); previewTimer = window.setTimeout(() => app.setBackdrop(d, 17.5), 220); };
+  const preview = () => { clearTimeout(previewTimer); previewTimer = window.setTimeout(() => app.setBackdrop(d, 15.8), 220); };
   const side = h('div', 'side glass scroll');
   const stats = h('div', 'stats glass scroll');
   const lockTag = (r: string | null) => (has(r) ? null : h('span', 'pill warn', '🔒 ' + (RESEARCH_BY_ID[r!]?.name || r)));
@@ -132,7 +132,7 @@ export function showDesigner(app: App, g: GameState | null, back: () => void, st
     if (!b) { toast('Niet genoeg geld', 'bad'); audio.warn(); return; }
     saveGame(g); audio.coin(); toast(`🏭 ${b.name} in productie: ${b.daysLeft} dagen`, 'good'); renderStats();
   }
-  renderSide(); renderStats(); app.setBackdrop(d, 17.5);
+  renderSide(); renderStats(); app.setBackdrop(d, 15.8);
   app.setScreen(h('div', 'screen designer',
     h('div', 'topbar glass', btn('‹ Terug', back, 'small ghost'), h('div', 'title', 'Ontwerper'), h('div', 'grow'), g ? h('span', 'pill', money(g.money)) : h('span', 'pill', 'Sandbox')),
     h('div', 'body', side, h('div', 'grow'), stats)));

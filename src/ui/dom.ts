@@ -17,7 +17,15 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<s
       else e.addEventListener(ev, v);
     } else e.setAttribute(k, String(v));
   }
-  for (const k of kids.flat()) if (k !== null && k !== undefined && k !== false) e.append(k as any);
+  for (const k of kids.flat()) {
+    if (k === null || k === undefined || k === false) continue;
+    if (typeof k === 'object' && !(k instanceof Node)) { // attributen als kind meegegeven
+      const a = k as any;
+      for (const key in a) { if (key === 'style' && typeof a[key] === 'object') Object.assign(e.style, a[key]); else if (key === 'class') e.className += ' ' + a[key]; else e.setAttribute(key, String(a[key])); }
+      continue;
+    }
+    e.append(k as any);
+  }
   return e;
 }
 export const btn = (label: string, onClick: () => void, cls = '') => h('button', { class: 'btn ' + cls, onClick }, label);

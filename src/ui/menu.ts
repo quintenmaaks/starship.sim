@@ -17,14 +17,14 @@ export function wordmark(size = 30) {
 }
 
 export function showMenu(app: App) {
-  app.setBackdrop(BUILTIN_DESIGNS.find((d) => d.id === 'v3c') || BUILTIN_DESIGNS[3], 18.7);
+  app.setBackdrop(BUILTIN_DESIGNS.find((d) => d.id === 'v3c') || BUILTIN_DESIGNS[3], 16.9);
   const item = (ic: string, t: string, s: string, on: () => void, hero = false) =>
     h('div', { class: 'item' + (hero ? ' hero' : ''), onClick: on }, h('div', 'ic', ic), h('div', null, h('div', 't', t), h('div', 's', s)));
   const last = slotInfo(settings.lastSlot);
   const daily = dailyChallenge(); const ds = dailyState();
   const ach = achievementsOf(null); const nAch = Object.keys(ach).length;
   const scr = h('div', 'screen menu',
-    h('div', 'brand', wordmark(30), h('div', 'tag', 'Starbase · vluchtsimulator & ruimtebedrijf')),
+    h('div', 'brand', wordmark(26), h('div', 'tag', 'Starbase · vluchtsimulator & ruimtebedrijf')),
     h('div', 'items',
       item('🚀', last ? 'Doorgaan: ' + last.company : 'Carrière', last ? `${gameDate(Math.floor(last.day))} · ${money(last.money)} · ${last.flights} vluchten` : 'Bouw je eigen ruimtebedrijf op', () => (last ? app.openCareer(settings.lastSlot) : careerSlots(app)), true),
       last ? item('🏢', 'Carrière & opslag', 'Opslagplaatsen, nieuw bedrijf', () => careerSlots(app)) : null,
@@ -88,7 +88,7 @@ export function sandbox(app: App, cat: 'flight' | 'test' | 'all' = 'all') {
   const ms = MISSIONS.filter((m) => m.cat !== 'scenario' && (cat === 'all' || m.cat === cat));
   let sel: MissionDef = ms[0];
   let design = findDesign(null, sel.designs[0]);
-  let hour = 16.5, wind = 4, rel: RelMode = 'perfect';
+  let hour = 15.5, wind = 4, rel: RelMode = 'perfect';
   const list = h('div', 'cards scroll', { style: { flex: '1', alignContent: 'start' } } as any);
   const side = h('div', 'panel glass scroll', { style: { width: '300px' } } as any);
   const renderList = () => {
@@ -108,7 +108,7 @@ export function sandbox(app: App, cat: 'flight' | 'test' | 'all' = 'all') {
       h('div', 'row', h('span', { style: { fontSize: '22px' } } as any, sel.icon), h('b', { style: { fontSize: '15px' } } as any, sel.title)),
       h('div', 'dim', { style: { fontSize: '11.5px', lineHeight: '1.35' } } as any, sel.desc),
       h('div', 'lbl', 'Voertuig'), seg(designs.map((d) => [d.id, d.name] as [string, string]), design.id, (id) => { design = findDesign(null, id); app.setBackdrop(design, hour); }),
-      h('div', 'lbl', 'Tijdstip'), seg([[8, 'Ochtend'], [13, 'Middag'], [16.5, 'Middag laat'], [18.7, 'Zonsondergang'], [23, 'Nacht']], hour, (v) => { hour = v; app.setBackdrop(design, hour); }),
+      h('div', 'lbl', 'Tijdstip'), seg([[8, 'Ochtend'], [13, 'Middag'], [15.5, 'Middag laat'], [16.9, 'Zonsondergang'], [23, 'Nacht']], hour, (v) => { hour = v; app.setBackdrop(design, hour); }),
       h('div', 'lbl', 'Wind'), seg([[0, 'Kalm'], [4, 'Licht'], [9, 'Matig'], [15, 'Stormachtig']], wind, (v) => (wind = v)),
       h('div', 'lbl', 'Betrouwbaarheid'), seg([['perfect', 'Perfect'], ['real', 'Realistisch'], ['rush', 'Gehaast']] as [RelMode, string][], rel, (v) => (rel = v)),
       h('div', 'grow'),

@@ -68,10 +68,10 @@ input[type=text] { background: rgba(255,255,255,.06); border: 1px solid var(--li
 /* hoofdmenu */
 .menu { justify-content: center; background: linear-gradient(90deg, rgba(3,6,12,.82) 0%, rgba(3,6,12,.45) 42%, rgba(3,6,12,0) 70%); }
 .menu .brand { position: absolute; left: calc(26px + var(--sal)); top: calc(18px + var(--sat)); }
-.menu .brand .wordmark { font-size: 30px; }
-.menu .brand .tag { font-size: 10px; letter-spacing: .32em; color: var(--dim); text-transform: uppercase; margin-top: 2px; padding-left: 2px; }
-.menu .items { display: flex; flex-direction: column; gap: 6px; margin-left: calc(14px + var(--sal)); margin-top: 46px; width: 270px; }
-.menu .item { display: flex; align-items: center; gap: 12px; padding: 9px 14px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); cursor: pointer; transition: background .15s, transform .1s, border-color .15s; }
+.menu .brand .wordmark { font-size: 26px; }
+.menu .brand .tag { font-size: 8.5px; letter-spacing: .22em; color: var(--dim); text-transform: uppercase; margin-top: 2px; padding-left: 2px; }
+.menu .items { display: flex; flex-direction: column; gap: 5px; margin-left: calc(14px + var(--sal)); margin-top: 62px; width: 270px; }
+.menu .item { display: flex; align-items: center; gap: 12px; padding: 7px 14px; border-radius: 12px; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.07); cursor: pointer; transition: background .15s, transform .1s, border-color .15s; }
 .menu .item:active { transform: scale(.98); }
 .menu .item:hover { background: rgba(255,255,255,.1); border-color: var(--line2); }
 .menu .item .ic { font-size: 18px; width: 24px; text-align: center; }

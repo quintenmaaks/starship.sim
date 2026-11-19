@@ -32,18 +32,18 @@ export class App {
     setInterval(() => { if (this.g && !this.inFlight) saveGame(this.g); }, 30000);
   }
   // ---------- achtergrond ----------
-  setBackdrop(design: Design = BUILTIN_DESIGNS[3], hour = 18.6, cam: 'free' | 'tower' = 'free') {
+  setBackdrop(design: Design = BUILTIN_DESIGNS[3], hour = 16.8, cam: 'free' | 'tower' = 'free') {
     const key = JSON.stringify(design) + hour;
     if (!this.backdrop || this.backdropDesign !== key) {
-      if (!this.backdrop || (this.backdrop as any)._hour !== hour) {
+      if (!this.backdrop) {
         const e = new Ephemeris(0); e.setLocalHour(REGIONS.gulf.lon, hour);
         this.backdrop = new World(e, ['gulf']);
-        (this.backdrop as any)._hour = hour;
-        this.view.setWorld(this.backdrop);
       } else {
         this.backdrop.vehicles = []; this.backdrop.anchors.clear();
         for (const t of this.backdrop.towers) t.caught = null;
       }
+      if ((this.backdrop as any)._hour !== hour) { (this.backdrop as any).ephem.setLocalHour(REGIONS.gulf.lon, hour); (this.backdrop as any)._hour = hour; this.backdrop.t = 0; this.backdrop.updateFrames(); }
+      if (this.view.world !== this.backdrop) this.view.setWorld(this.backdrop);
       const spec = designToSpec(design);
       const pad = spec.stages.length > 1 ? 'olm' : 'padB';
       const v = this.backdrop.spawnOnPad(spec, 'stack', 'gulf', pad);
@@ -52,7 +52,7 @@ export class App {
       this.backdropDesign = key;
     } else if (this.view.world !== this.backdrop) { this.view.setWorld(this.backdrop); this.view.focus = this.backdrop.vehicles[0]; }
     this.view.setCam(cam);
-    this.view.camPitch = 0.1; this.view.zoom = design.booster.enabled ? 1.25 : 2.2; this.view.cineSpin = 0.035;
+    this.view.camPitch = 0.1; this.view.zoom = design.booster.enabled ? 0.95 : 1.8; this.view.cineSpin = 0.035;
     this.startLoop();
   }
   startLoop() { if (!this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame(this.loop); } }
