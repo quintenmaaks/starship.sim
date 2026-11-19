@@ -305,3 +305,62 @@ export function planMidCourse(w: World, v: Vehicle, targetPeri = 110000): Maneuv
   }
   return { t: w.t + tDep, pro: best.dv, nrm: 0, rad: best.dr };
 }
+
+// ===== Opstijgen vanaf de Maan naar een lage maanbaan =====
+export class LunarAscentProgram extends Program {
+  t = 0; stage: 'rise' | 'pitch' | 'coast' | 'circ' = 'rise';
+  constructor(v: Vehicle, public targetAlt = 80000, public azDeg = 0) { super(v); this.phase = 'Lancering vanaf de Maan'; }
+  update(dt: number, w: World) {
+    const v = this.v;
+    if (v.state === 'landed') { v.selectEngines('vac'); v.cmdThrottle = 0.6; this.phase = 'Ontsteking'; return; }
+    if (v.state !== 'flying') { this.done = true; return; }
+    this.t += dt;
+    const mc = w.ephem.moonPos(w.t), mv = w.ephem.moonVel(w.t);
+    const r = v.pos.clone().sub(mc), vel = v.vel.clone().sub(mv);
+    const up = r.clone().normalize();
+    const vr = vel.dot(up);
+    const vh = vel.clone().addScaledVector(up, -vr);
+    // horizontale richting: azimut t.o.v. lokaal noord (as = maan-noord ≈ +Y)
+    const north = new THREE.Vector3(0, 1, 0).addScaledVector(up, -up.y).normalize();
+    const east = new THREE.Vector3().crossVectors(north, up).normalize();
+    const az = this.azDeg * Math.PI / 180;
+    const hdir = vh.length() > 30 ? vh.clone().normalize() : north.clone().multiplyScalar(Math.cos(az)).addScaledVector(east, Math.sin(az));
+    const el = elements(r, vel, MU_M, R_M);
+    const alt = r.length() - R_M;
+    v.selectEngines('vac');
+    if (this.stage === 'rise') {
+      point(v, up, hdir.clone().negate()); v.cmdThrottle = 0.55; v.legsDown = true;
+      this.phase = 'Verticale klim';
+      if (this.t > 6) { this.stage = 'pitch'; w.emit('Kanteling naar de baan', 'info', v); }
+    } else {
+      const g = MU_M / r.lengthSq() - vh.lengthSq() / r.length();
+      const th = v.thrustInfo(0); const F = Math.max(th.F, 1);
+      v.cmdThrottle = clamp(2.5 * 9.81 * v.mass / F, 0.1, 1);
+      const aT = F * v.cmdThrottle / v.mass;
+      const vrStar = clamp((15000 - alt) / 30, 0, 90);
+      const s2 = clamp(((vrStar - vr) / 8 + g) / aT, -0.3, 0.9);
+      const dir = hdir.clone().multiplyScalar(Math.sqrt(1 - s2 * s2)).addScaledVector(up, s2);
+      point(v, dir, up.clone().negate());
+      v.legsDown = false;
+      this.phase = 'Klim naar maanbaan';
+      this.status = `Apo ${(el.apo / 1000).toFixed(0)} km · Peri ${(el.peri / 1000).toFixed(0)} km`;
+      if (this.stage === 'circ') {
+        point(v, hdir, up.clone().negate());
+        const need = Math.sqrt(MU_M / r.length()) - vh.length();
+        v.cmdThrottle = clamp(need / 30, 0.05, 1) * Math.min(1, 2.5 * 9.81 * v.mass / F);
+        this.phase = 'Circularisatie';
+        if (need <= 0.5 || el.peri >= this.targetAlt * 0.85 || v.active.prop <= 0) {
+          v.cmdThrottle = 0; this.done = true;
+          if (el.peri < 10000) w.emit('Brandstof op vóór de maanbaan!', 'fail', v);
+          else w.emit(`In maanbaan: ${(el.apo / 1000).toFixed(0)} × ${(el.peri / 1000).toFixed(0)} km`, 'seco', v);
+        }
+      } else if (this.stage === 'coast') {
+        v.cmdThrottle = 0; point(v, hdir, up.clone().negate());
+        this.phase = 'Kust naar apolunium';
+        if (vr <= 1) { this.stage = 'circ'; w.emit('Circularisatiebrand', 'info', v); }
+      } else if (el.apo >= this.targetAlt) { v.cmdThrottle = 0; this.stage = 'coast'; w.emit('Motoren uit — kust naar apolunium', 'meco', v); }
+      else if (v.active.prop <= 0) { this.done = true; w.emit('Brandstof op vóór de maanbaan!', 'fail', v); }
+    }
+  }
+  busy() { return !this.done; }
+}

@@ -106,6 +106,12 @@ if (which === 'lunar') {
   let last = 0;
   while (w.t < 1500 && v.state === 'flying') { w.step(w.dt); if (w.t - last > 20) { last = w.t; console.log(`t=${w.t.toFixed(0)} alt=${(v.tel.alt/1000).toFixed(2)} vs=${v.tel.vSurf.toFixed(0)} vv=${v.tel.vVert.toFixed(1)} prop=${(v.propFrac*100).toFixed(1)}% thr=${v.cmdThrottle.toFixed(2)} ${v.ap.phase} ${v.ap.status}`); } }
   console.log('END', v.state, w.toLocal('lunar', v.pos));
+  if (process.env.ASC && v.state === 'landed') {
+    const { LunarAscentProgram } = await import('../src/sim/programs2');
+    v.ap = new LunarAscentProgram(v, 80000, 0); let l2 = w.t;
+    while (!v.ap.done && w.t < l2 + 6000) { w.step(w.dt); if (w.t - last > 20) { last = w.t; console.log(`t=${w.t.toFixed(0)} alt=${(v.tel.alt/1000).toFixed(2)} vs=${v.tel.vSurf.toFixed(0)} prop=${(v.propFrac*100).toFixed(1)}% ${v.ap.phase} ${v.ap.status}`); } }
+    console.log('ASC END', v.state, v.ap.done);
+  }
 }
 if (which === 'dock') {
   const e = new Ephemeris(0); e.setLocalHour(-97.157, 10);

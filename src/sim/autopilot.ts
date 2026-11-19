@@ -215,7 +215,6 @@ export class LandingGuidance {
     const belly = v.belly();
     point(v, dirW, belly);
     if (h < 400 && v.active.spec.legs) v.legsDown = true;
-    if ((globalThis as any).CATCHDBG && h < 12) console.log("LG", ls.p.x.toFixed(2), w.toLocal(this.tgt.region, v.pos).x.toFixed(2), v.id, ex.toFixed(2), ez.toFixed(2), h.toFixed(1), ax.toFixed(2), az.toFixed(2), "vel", ls.vel.x.toFixed(2), "nose", v.nose().applyQuaternion(ls.inv).x.toFixed(3), "acc", v.accel.clone().applyQuaternion(ls.inv).x.toFixed(2), v.cmdThrottle.toFixed(2), v.enginesRunning());
     return { h, dist, vt };
   }
 }

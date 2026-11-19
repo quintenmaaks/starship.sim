@@ -439,7 +439,6 @@ export class World {
       return;
     }
     const l = this.toLocal(reg.def.id, v.pos, _v1);
-    if ((globalThis as any).CATCHDBG && v.role === "booster" && l.y < 60) console.log("GR", v.id, l.x.toFixed(2), l.y.toFixed(2), l.z.toFixed(2), this.towers.length, v.active.spec.catchPins, v.stages.length);
     // torenbotsing / vangst
     for (const tw of this.towers) {
       if (tw.region !== reg.def.id) continue;
@@ -456,7 +455,6 @@ export class World {
       if (st.spec.catchPins && v.stages.length === 1 && !tw.caught && dxPad < 12) {
         const pinY = l.y + v.length * 0.86;
         const armY = tw.armH;
-        if ((globalThis as any).CATCHDBG && Math.abs(pinY - armY) < 4) console.log("catch?", dxPad.toFixed(2), (pinY - armY).toFixed(2), T.vVert.toFixed(2), T.vHoriz.toFixed(2), T.tilt.toFixed(1), l.x.toFixed(2), l.y.toFixed(1), l.z.toFixed(2), tw.key);
         if (Math.abs(pinY - armY) < 1.5 && l.y > p.top + 2) {
           const tilt = T.tilt, vv = T.vVert, hv = T.vHoriz;
           if (dxPad < 4.5 && vv > -5 && hv < 2.5 && tilt < 7) {
