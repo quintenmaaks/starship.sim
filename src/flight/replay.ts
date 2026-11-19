@@ -14,7 +14,7 @@ export interface ReplayData {
   vehicles: { spec: VehicleSpec; role: Vehicle['role']; name: string; born: number }[];
   frames: { t: number; d: (number[] | null)[]; tw: number[] }[];
   events: { t: number; text: string; kind: string; vi: number }[];
-  duration: number;
+  duration: number; score?: number;
 }
 export class Recorder {
   data: ReplayData;

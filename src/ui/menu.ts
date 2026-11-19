@@ -5,7 +5,7 @@ import { audio } from './audio';
 import { SLOTS, slotInfo, newGame, saveGame, deleteSave, settings, saveSettings, allDesigns, globalRecords, findDesign } from '../game/state';
 import { MISSIONS, MissionDef } from '../game/missions';
 import { designAllowed } from '../game/career';
-import { ACHIEVEMENTS, achievementsOf } from '../game/economy';
+import { ACHIEVEMENTS, achievementsOf, grantAchievement } from '../game/economy';
 import { money, gameDate, duration } from '../core/util';
 import { quickFly, dailyChallenge, dailyState, markDaily, RelMode } from './launch';
 import { showDesigner } from './designer';
@@ -45,12 +45,12 @@ export function showMenu(app: App) {
         h('div', 'grow'),
         btn('Spelen', () => quickFly(app, daily.mission, daily.design, {
           hour: daily.hour, wind: daily.wind, relMode: 'perfect', back: () => showMenu(app),
-          onResult: (r) => { if (daily.check(r)) { const s = markDaily(daily.key); toast(`Dagelijkse uitdaging voltooid! Reeks: ${s.streak} 🔥`, 'gold', 4000); audio.fanfare(); } },
+          onResult: (r) => { if (daily.check(r)) { const s = markDaily(daily.key); grantAchievement(null, 'daily', []); toast(`Dagelijkse uitdaging voltooid! Reeks: ${s.streak} 🔥`, 'gold', 4000); audio.fanfare(); } },
         }), 'small go')),
       h('div', { style: { height: '1px', background: 'rgba(255,255,255,.08)', margin: '9px 0 7px' } }),
       h('div', 'kv', h('span', null, 'Prestaties'), h('b', null, `${nAch}/${ACHIEVEMENTS.length}`)),
-      h('div', 'kv', h('span', null, 'Hoogste score'), h('b', null, globalRecords.bestScore ? String(Math.round(globalRecords.bestScore)) : '—')),
-      h('div', 'kv', h('span', null, 'Snelste vangst-precisie'), h('b', null, globalRecords.bestCatchAcc ? globalRecords.bestCatchAcc.toFixed(2) + ' m' : '—'))),
+      h('div', 'kv', h('span', null, 'Hoogste score'), h('b', null, bestOf('score_', Math.max))),
+      h('div', 'kv', h('span', null, 'Preciezer landing/vangst'), h('b', null, bestOf('acc_', Math.min, ' m')))),
     h('div', 'foot', 'Niet-commerciële fangame · geen officieel SpaceX-product', h('br'), 'Zet op beginscherm via Deel → "Zet op beginscherm"'));
   app.setScreen(scr);
 }
@@ -73,7 +73,7 @@ function newCompany(app: App, slot: number) {
   const inp = h('input', { class: 'inp', value: names[Math.floor(Math.random() * names.length)], maxlength: 28, style: { width: '100%', padding: '9px', borderRadius: '10px', border: '1px solid rgba(255,255,255,.2)', background: 'rgba(0,0,0,.3)', color: '#fff', fontSize: '15px' } }) as HTMLInputElement;
   let mode: 'career' | 'sandbox' = 'career';
   const seg = h('div', 'seg');
-  const segs = [['career', 'Carrière', 'Start met $450 mln, een Starhopper en een droom.'], ['sandbox', 'Onbeperkt', '$50 mld, alles ontgrendeld. Puur bouwen en vliegen.']] as const;
+  const segs = [['career', 'Carrière', 'Start met € 450 mln, een Starhopper en een droom.'], ['sandbox', 'Onbeperkt', '€ 50 mld, alles ontgrendeld. Puur bouwen en vliegen.']] as const;
   const desc = h('div', 'dim', { style: { fontSize: '11px', marginTop: '5px' } } as any, segs[0][2]);
   for (const [id, lab, d] of segs) { const b = btn(lab, () => { mode = id; [...seg.children].forEach((c) => c.classList.remove('on')); b.classList.add('on'); desc.textContent = d; }, 'small' + (id === mode ? ' on' : '')); seg.append(b); }
   modal('Nieuw ruimtebedrijf', h('div', null, h('div', 'lbl', 'Bedrijfsnaam'), inp, h('div', 'lbl', { style: { marginTop: '10px' } } as any, 'Modus'), seg, desc), [
@@ -95,7 +95,7 @@ export function sandbox(app: App, cat: 'flight' | 'test' | 'all' = 'all') {
     list.replaceChildren(...ms.map((m) => h('div', { class: 'card' + (m === sel ? ' sel' : ''), onClick: () => { sel = m; design = findDesign(null, m.designs[0]); renderList(); renderSide(); app.setBackdrop(design, hour); } },
       h('div', 'row', h('span', 'ic', m.icon), h('div', 'grow'), h('span', 'pill ' + (m.cat === 'test' ? 'acc' : ''), m.cat === 'test' ? 'TEST' : 'VLUCHT'), h('span', 'pill', '★'.repeat(m.hard))),
       h('div', 't', m.title), h('div', 's', m.short),
-      globalRecords['best_' + m.id] ? h('div', 'pill gold', 'Beste: ' + Math.round(globalRecords['best_' + m.id])) : null)));
+      globalRecords['score_' + m.id] ? h('div', 'pill gold', 'Beste: ' + Math.round(globalRecords['score_' + m.id])) : null)));
   };
   const seg = <T,>(opts: [T, string][], cur: T, set: (v: T) => void) => {
     const s = h('div', 'seg');
@@ -127,9 +127,9 @@ export function scenarios(app: App) {
   const ach = achievementsOf(null);
   app.setBackdrop(findDesign(null, 'v2'), 7.2);
   app.setScreen(h('div', 'screen',
-    h('div', 'topbar glass', btn('‹ Terug', () => showMenu(app), 'small ghost'), h('div', 'title', "Scenario's"), h('div', 'grow'), h('span', 'pill gold', `${ms.filter((m) => globalRecords['best_' + m.id] > 0).length}/${ms.length} voltooid`)),
+    h('div', 'topbar glass', btn('‹ Terug', () => showMenu(app), 'small ghost'), h('div', 'title', "Scenario's"), h('div', 'grow'), h('span', 'pill gold', `${ms.filter((m) => globalRecords['score_' + m.id] > 0).length}/${ms.length} voltooid`)),
     h('div', 'cards scroll', { style: { flex: '1', alignContent: 'start' } } as any, ...ms.map((m) => {
-      const best = globalRecords['best_' + m.id];
+      const best = globalRecords['score_' + m.id];
       return h('div', { class: 'card', onClick: () => modal(m.icon + ' ' + m.title, h('div', null, h('p', null, m.desc), h('div', 'row', h('span', 'pill', 'Moeilijkheid ' + '★'.repeat(m.hard)), best ? h('span', 'pill gold', 'Record ' + Math.round(best)) : null)), [
         { label: 'Terug', cls: 'ghost' },
         { label: 'Start ▶', cls: 'go', onClick: () => quickFly(app, m, findDesign(null, m.designs[0]), { relMode: m.id === 'sc_engineout' ? 'real' : 'perfect', wind: m.id === 'sc_wind' ? 16 : 3, back: () => scenarios(app) }) }]) },
@@ -173,17 +173,23 @@ export function records(app: App) {
     h('div', 'lbl', 'Prestaties'),
     h('div', 'cards', ...ACHIEVEMENTS.map((a) => h('div', { class: 'card' + (ach[a.id] ? '' : ' locked') }, h('div', 'row', h('span', 'ic', ach[a.id] ? a.icon : '🔒'), h('b', null, a.title)), h('div', 's', a.desc)))),
     h('div', 'lbl', { style: { marginTop: '10px' } } as any, 'Records'),
-    ...Object.entries(globalRecords).filter(([k]) => !k.startsWith('best_')).map(([k, v]) => h('div', 'kv', h('span', null, REC_LABEL[k] || k), h('b', null, fmtRec(k, v)))),
+    ...Object.entries(globalRecords).filter(([k]) => !k.startsWith('score_') && !k.startsWith('acc_')).map(([k, v]) => h('div', 'kv', h('span', null, REC_LABEL[k] || k), h('b', null, fmtRec(k, v)))),
     h('div', 'lbl', { style: { marginTop: '10px' } } as any, 'Opgeslagen herhalingen (beste vluchten)'),
     reps.length ? h('div', 'cards', ...reps.map((k) => { const d = loadReplay(k); return d ? h('div', { class: 'card', onClick: () => { md.close(); app.replay(d, () => showMenu(app)); } }, h('div', 't', '▶ ' + d.title), h('div', 's', `${duration(d.duration)} · score ${Math.round(d.score || 0)}`)) : null; })) : h('div', 'dim', 'Nog geen herhalingen. Vlieg een missie!'));
   const md = modal('Records & prestaties', body, [{ label: 'Sluiten' }], true);
 }
-export const REC_LABEL: Record<string, string> = { bestScore: 'Hoogste missiescore', bestCatchAcc: 'Preciezer vangst (m)', bestLandAcc: 'Preciezer landing (m)', maxAlt: 'Grootste hoogte', maxSpeed: 'Hoogste snelheid', maxG: 'Hoogste g-kracht', flights: 'Vluchten', catches: 'Vangsten', maxPressure: 'Hoogste tankdruk' };
+export const REC_LABEL: Record<string, string> = { bestScore: 'Hoogste missiescore', bestCatchAcc: 'Preciezer vangst (m)', bestLandAcc: 'Preciezer landing (m)', maxAlt: 'Grootste hoogte', maxSpeed: 'Hoogste snelheid', maxG: 'Hoogste g-kracht', flights: 'Vluchten', catches: 'Vangsten', pressure: 'Hoogste tankdruk' };
 export function fmtRec(k: string, v: number) {
   if (k === 'maxAlt') return v > 1e5 ? (v / 1000).toFixed(0) + ' km' : v.toFixed(0) + ' m';
   if (k === 'maxSpeed') return (v * 3.6).toFixed(0) + ' km/u';
   if (k.endsWith('Acc')) return v.toFixed(2) + ' m';
   if (k === 'maxG') return v.toFixed(1) + ' g';
-  if (k === 'maxPressure') return v.toFixed(2) + ' bar';
+  if (k === 'pressure') return v.toFixed(2) + ' bar';
   return String(Math.round(v));
+}
+
+function bestOf(prefix: string, f: (...v: number[]) => number, unit = '') {
+  const v = Object.entries(globalRecords).filter(([k]) => k.startsWith(prefix)).map(([, x]) => x);
+  if (!v.length) return '—';
+  const r = f(...v); return unit ? r.toFixed(2) + unit : String(Math.round(r));
 }

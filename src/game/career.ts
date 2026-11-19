@@ -6,6 +6,7 @@ import { RESEARCH_BY_ID } from './research';
 import { Prep, reliabilityFor, missionCost, refurbCost, buildDays, addMoney, news, stockShock, advanceDays, grantMilestone, grantAchievement, certified, padRecoveryDays, heritageOf } from './economy';
 import { clamp, money } from '../core/util';
 import type { FlightResult } from '../flight/controller';
+import { saveBestReplay } from '../flight/replay';
 
 export interface Lock { ok: boolean; why: string[] }
 export function missionLock(g: GameState | null, m: MissionDef): Lock {
@@ -74,7 +75,7 @@ export function applyResult(g: GameState | null, ctx: FlightCtx, r: FlightResult
   };
   if (r.metrics.maxAlt) rec('maxAlt', r.metrics.maxAlt, 'Hoogste vlucht');
   if (r.metrics.maxSpeed) rec('maxSpeed', r.metrics.maxSpeed, 'Hoogste snelheid');
-  if (r.success) rec('score_' + m.id, r.score, 'Beste score: ' + m.title);
+  if (r.success) { const before = globalRecords['score_' + m.id]; rec('score_' + m.id, r.score, 'Beste score: ' + m.title); if (before === undefined || r.score > before) { r.replay.score = r.score; r.replay.title = m.title; saveBestReplay(m.id, r.replay); } }
   if (r.metrics.accuracy !== undefined && (did('land') || did('bcatch') || did('sland'))) rec('acc_' + m.id, r.metrics.accuracy, 'Nauwkeurigste landing: ' + m.title, true);
   if (r.metrics.pressure) rec('pressure', r.metrics.pressure, 'Hoogste tankdruk');
   saveRecords();
