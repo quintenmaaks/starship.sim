@@ -26,6 +26,7 @@ async function start() {
   const app = new App(view);
   (window as any).__app = app;
   await step(60, 'Starbase bouwen: OLM, Mechazilla, tankopslag…');
+  if (params.has('qa')) { const { installQA } = await import('./qa'); installQA(app); }
   if (params.has('dev')) { const { devtest } = await import('./devtest'); devtest(view, params.get('dev') || 'launch'); }
   else app.menu();
   await step(85, 'Shaders compileren…');

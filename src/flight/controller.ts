@@ -163,6 +163,7 @@ export class FlightController {
     if (setup.mission.id === 'lunar' || setup.mission.id === 'crewlunar' || setup.mission.id === 'sc_artemis') view.setCam('chase');
     setup.world.on((e) => this.onEvent(e));
     this.buildControls();
+    (window as any).__fc = this;
     if (setup.custom === 'pressure') this.buildPressure();
     if (setup.hint) setTimeout(() => toast(setup.hint, '', 5200), 600);
     this.keyDown = this.keyDown.bind(this); this.keyUp = this.keyUp.bind(this);
