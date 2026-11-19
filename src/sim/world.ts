@@ -15,6 +15,7 @@ interface Anchor { region: string; local: THREE.Vector3; lq: THREE.Quaternion; }
 
 const _v1 = new THREE.Vector3(), _v2 = new THREE.Vector3(), _v3 = new THREE.Vector3(), _v4 = new THREE.Vector3(), _v5 = new THREE.Vector3();
 const _q1 = new THREE.Quaternion();
+const _s1 = new THREE.Vector3(), _s2 = new THREE.Vector3(), _s3 = new THREE.Vector3();
 const _atm = { p: 0, rho: 0, T: 0, a: 0 };
 const OMEGA = new THREE.Vector3(0, OMEGA_E, 0);
 
@@ -70,10 +71,10 @@ export class World {
   }
   surfaceVel(body: 'earth' | 'moon', p: THREE.Vector3, out = new THREE.Vector3()) {
     if (body === 'earth') return out.crossVectors(OMEGA, p);
-    const c = this.ephem.moonPos(this.t, _v4);
-    const n = this.ephem.moonNormal(_v5).multiplyScalar(2 * Math.PI / MOON_PERIOD);
-    out.crossVectors(n, _v3.copy(p).sub(c));
-    return out.add(this.ephem.moonVel(this.t, _v4));
+    const c = this.ephem.moonPos(this.t, _s1);
+    const n = this.ephem.moonNormal(_s2).multiplyScalar(2 * Math.PI / MOON_PERIOD);
+    out.crossVectors(n, _s3.copy(p).sub(c));
+    return out.add(this.ephem.moonVel(this.t, _s1));
   }
   dominant(p: THREE.Vector3): 'earth' | 'moon' {
     const m = this.ephem.moonPos(this.t, _v4);
@@ -162,10 +163,11 @@ export class World {
     this.railMode = this.warp > 4 && coasting;
     if (this.railMode) {
       let left = total;
-      while (left > 0) {
-        const h = Math.min(left, 60);
+      while (left > 0 && this.railMode) {
+        const h = Math.min(left, 20);
         this.railStep(h);
         left -= h;
+        if (this.warp <= 4) break;
       }
       return;
     }
@@ -193,8 +195,11 @@ export class World {
         kepler(r, vv, h, MU_M, r, vv);
         v.pos.copy(r).add(mp2); v.vel.copy(vv).add(mv2);
       }
-      // hold attitude relatief traag
       this.telemetry(v);
+      if (v.ap && !v.ap.done) { v.ap.update(h, this); if (v.cmdThrottle > 0) { this.warp = Math.min(this.warp, 1); } }
+      // tijdens tijdversnelling: houding direct op doel (zoals SAS 'op rails')
+      if (v.sas === 'target') v.q.copy(v.targetQuat);
+      v.w.set(0, 0, 0);
       const bodyR = v.tel.body === 'earth' ? R_E : R_M;
       if (v.tel.alt < (v.tel.body === 'earth' ? ATMO_TOP : 5000)) { this.warp = Math.min(this.warp, 4); }
       if (v.tel.alt < 0 && bodyR) { v.destroy('Inslag tijdens tijdversnelling'); this.emit('Inslag!', 'rud', v); }
