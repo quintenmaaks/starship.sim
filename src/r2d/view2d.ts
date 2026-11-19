@@ -62,7 +62,7 @@ export class View2D {
     this.canvas.style.width = this.W + 'px'; this.canvas.style.height = this.H + 'px';
   }
   setWorld(w: World | null) {
-    this.world = w; this.parts = []; this.dead.clear(); this.flashes = []; this.orbitPts = []; this.mapLines.info = null; this.nS.set(0, 0, 0);
+    this.world = w; this.sF = 0; this.parts = []; this.dead.clear(); this.flashes = []; this.orbitPts = []; this.mapLines.info = null; this.nS.set(0, 0, 0);
     if (w) w.on((e) => this.onEvent(e));
   }
   onEvent(e: SimEvent) {
@@ -91,7 +91,7 @@ export class View2D {
     this.parts.push({ p: p.clone(), v: v.clone(), t: 0, life, s0, s1, a, kind, drag });
   }
   cycleCam() { const o: CamMode[] = ['chase', 'tower', 'drone', 'map']; this.setCam(o[(o.indexOf(this.camMode) + 1) % o.length]); }
-  setCam(m: CamMode) { this.camMode = m; this.zoom = 1; this.pan.set(0, 0); if (m === 'map') { this.mapZoom = 1; } }
+  setCam(m: CamMode) { this.camMode = m; this.sF = 0; this.zoom = 1; this.pan.set(0, 0); if (m === 'map') { this.mapZoom = 1; } }
   orbitInput(dx: number, dy: number) {
     if (this.camMode === 'map') { this.pan.x -= dx / this.mapScale(); this.pan.y += dy / this.mapScale(); }
     else { this.pan.x -= dx / this.s; this.pan.y += dy / this.s; }
@@ -110,7 +110,7 @@ export class View2D {
   sy(p: THREE.Vector3) { return this.H * this.cyF - _d.copy(p).sub(this.center).dot(this.up) * this.s; }
   cyF = 0.5;
   mapScale() { return this.mapS; }
-  mapS = 1e-5;
+  mapS = 1e-5; sF = 0;
 
   // ---------------- frame ----------------
   render(dt: number) {
@@ -177,7 +177,8 @@ export class View2D {
     }
     // pan loslaten na stilstand
     this.panIdle += dt; if (this.panIdle > 4) this.pan.multiplyScalar(Math.max(0, 1 - dt * 2));
-    this.s = s0 / this.zoomS;
+    const sT = s0 / this.zoomS;
+    this.s = this.sF > 0 ? Math.exp(lerp(Math.log(this.sF), Math.log(sT), Math.min(1, dt * 3))) : sT; this.sF = this.s;
     // camera niet onder de grond: houd grond onder het midden als we dichtbij zijn
     this.center.copy(target).addScaledVector(this.tan, this.pan.x).addScaledVector(this.up, this.pan.y);
     if (this.shake > 0) { const k = this.shake * 6 / this.s; this.center.addScaledVector(this.tan, (Math.random() - 0.5) * k).addScaledVector(this.up, (Math.random() - 0.5) * k); this.shake = Math.max(0, this.shake - dt * 1.2); }
@@ -550,14 +551,12 @@ export class View2D {
       const g = x.createLinearGradient(0, 0, 0, len);
       g.addColorStop(0, `rgba(255,150,90,${0.38 * k})`); g.addColorStop(0.4, `rgba(220,90,150,${0.16 * k})`); g.addColorStop(1, 'rgba(120,60,200,0)');
       x.fillStyle = g;
-      x.beginPath(); x.moveTo(-wd * 0.52, -wd * 0.02); x.bezierCurveTo(-wd * 0.5, len * 0.3, -wd * 0.12, len * 0.7, 0, len); x.bezierCurveTo(wd * 0.12, len * 0.7, wd * 0.5, len * 0.3, wd * 0.52, -wd * 0.02); x.closePath(); x.fill();
+      x.beginPath(); x.moveTo(-wd * 0.52, -wd * 0.02); x.bezierCurveTo(-wd * 0.34, len * 0.22, -wd * 0.05, len * 0.6, 0, len); x.bezierCurveTo(wd * 0.05, len * 0.6, wd * 0.34, len * 0.22, wd * 0.52, -wd * 0.02); x.closePath(); x.fill();
     } else {
       const g = x.createRadialGradient(0, -wd * 0.08, 0, 0, -wd * 0.08, wd * 0.55);
-      g.addColorStop(0, `rgba(255,235,245,${0.4 * k})`); g.addColorStop(0.5, `rgba(255,130,190,${0.22 * k})`); g.addColorStop(1, 'rgba(255,90,150,0)');
+      g.addColorStop(0, `rgba(255,240,245,${0.6 * k})`); g.addColorStop(0.5, `rgba(255,140,190,${0.3 * k})`); g.addColorStop(1, 'rgba(255,90,150,0)');
       x.fillStyle = g; x.beginPath(); x.ellipse(0, -wd * 0.08, wd * 0.55, wd * 0.16, 0, 0, Math.PI * 2); x.fill();
-      // boeggolf
-      x.strokeStyle = `rgba(255,170,215,${0.55 * k})`; x.lineWidth = Math.max(1.5, wd * 0.025);
-      x.beginPath(); x.moveTo(-wd * 0.6, wd * 0.12); x.quadraticCurveTo(0, -wd * 0.36 * fl, wd * 0.6, wd * 0.12); x.stroke();
+
     }
     x.globalCompositeOperation = 'source-over'; x.restore();
   }

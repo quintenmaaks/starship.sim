@@ -1,4 +1,4 @@
-// App: schermbeheer, 3D-achtergrond (Starbase bij zonsondergang), starten van vluchten en herhalingen.
+// App: schermbeheer, 2D-achtergrond (Starbase bij zonsondergang), starten van vluchten en herhalingen.
 import { View2D as View } from './r2d/view2d';
 import { World } from './sim/world';
 import { Ephemeris } from './sim/bodies';

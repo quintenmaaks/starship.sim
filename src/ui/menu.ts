@@ -154,7 +154,6 @@ export function settingsModal(onChange?: () => void) {
   };
   body.append(
     h('div', 'pill acc', { style: { marginBottom: '6px' } } as any, 'Grafiek: ULTRA — altijd maximale kwaliteit'),
-    localStorage.getItem('ss_gfx_safe') === '1' ? row('Veilige grafische modus actief (na crash)', btn('Ultra opnieuw', () => { localStorage.removeItem('ss_gfx_safe'); location.reload(); }, 'small primary')) : null,
     row('FPS-teller', toggle('fps'), 'Toont beelden per seconde tijdens het spel'),
     row('Geluidseffecten', slider('sound', 0, 1)),
     row('Muziek', slider('music', 0, 1)),
