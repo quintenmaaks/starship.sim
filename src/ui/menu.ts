@@ -119,7 +119,7 @@ export function sandbox(app: App, cat: 'flight' | 'test' | 'all' = 'all') {
   app.setBackdrop(design, hour);
   app.setScreen(h('div', 'screen',
     h('div', 'topbar glass', btn('‹ Terug', () => showMenu(app), 'small ghost'), h('div', 'title', cat === 'test' ? 'Testcentrum' : 'Vrije vlucht'), h('div', 'grow'), h('span', 'pill', 'Sandbox · geen kosten')),
-    h('div', 'body', list, side)));
+    h('div', 'body sbody', list, side)));
 }
 
 // ---------- Scenario's ----------

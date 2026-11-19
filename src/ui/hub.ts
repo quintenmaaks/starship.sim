@@ -112,7 +112,7 @@ function tabOverview(app: App, g: GameState, render: () => void) {
   const right = h('div', 'panel glass scroll', { style: { flex: '1' } } as any,
     h('div', 'lbl', '📰 Nieuws'),
     ...(g.news.length ? g.news.slice(0, 25).map((n) => h('div', 'news ' + n.kind, h('span', 'd', gameDate(n.day)), n.text)) : [h('div', 'dim', { style: { fontSize: '12px' } } as any, 'Welkom in Starbase! Het verhaal van je bedrijf begint hier. Vlieg je eerste hop en de pers volgt vanzelf.')]));
-  return h('div', { style: { display: 'flex', gap: '8px', flex: '1', minHeight: '0' } }, left, right);
+  return h('div', { class: 'split' }, left, right);
 }
 
 // ---------------- Missies ----------------
@@ -214,7 +214,7 @@ function tabContracts(app: App, g: GameState, render: () => void) {
 function tabFleet(app: App, g: GameState, render: () => void) {
   const busy = g.builds.filter((b) => !b.ready && b.flights === 0).length;
   const designs = [...['hopper', 'sn', 'ift', 'v2', 'v3t', 'v3c', 'hls'].map((id) => findDesign(g, id)), ...g.designs];
-  return h('div', { style: { display: 'flex', gap: '8px', flex: '1', minHeight: '0' } },
+  return h('div', { class: 'split' },
     h('div', 'panel glass scroll', { style: { flex: '1' } } as any,
       h('div', 'lbl', `Voertuigen · High Bay ${busy}/${maxParallelBuilds(g)} in gebruik`),
       h('div', 'cards', ...g.builds.map((b) => h('div', 'card',
@@ -276,7 +276,7 @@ function tabFacilities(_app: App, g: GameState, render: () => void) {
 function tabTeam(_app: App, g: GameState, render: () => void) {
   const tq = teamQuality(g);
   const roles = Object.keys(ROLES) as (keyof GameState['team'])[];
-  return h('div', { style: { display: 'flex', gap: '8px', flex: '1', minHeight: '0' } },
+  return h('div', { class: 'split' },
     h('div', 'panel glass scroll', { style: { flex: '1' } } as any, h('div', 'lbl', 'Personeel'),
       ...roles.map((r) => h('div', 'goal', h('div', 'grow', h('b', null, `${ROLES[r].name}: ${g.team[r]}`), h('div', 'dim', { style: { fontSize: '10px' } } as any, `${ROLES[r].desc} · ${money(ROLES[r].salary)}/jaar`)),
         btn('−10', () => { hire(g, r, -Math.min(10, g.team[r])); saveGame(g); render(); }, 'tiny ghost'),
@@ -298,7 +298,7 @@ function tabFinance(_app: App, g: GameState, render: () => void) {
   const pts = g.stock.map((s) => ({ x: s.d, y: s.p }));
   const chartBox = h('div', null, g.isPublic && pts.length > 1 ? lineChart(pts, 420, 150, pts[pts.length - 1].y >= pts[0].y ? '#4be38a' : '#ff7a6a') : h('div', 'dim', { style: { fontSize: '11px', padding: '30px 0', textAlign: 'center' } } as any, g.isPublic ? 'Koersgeschiedenis wordt opgebouwd…' : 'Nog niet beursgenoteerd. Na een IPO zie je hier de koers live reageren op vluchten — en op lange stiltes.'));
   const growth = g.isPublic && g.stock.length ? g.sharePrice / g.stock[0].p - 1 : 0;
-  return h('div', { style: { display: 'flex', gap: '8px', flex: '1', minHeight: '0' } },
+  return h('div', { class: 'split' },
     h('div', 'panel glass scroll', { style: { flex: '1.3' } } as any,
       h('div', 'row', h('div', null, h('div', 'lbl', g.isPublic ? 'Aandeel STAR' : 'Bedrijfswaardering'), h('div', { style: { fontSize: '26px', fontWeight: 900, fontFamily: 'var(--mono)' } } as any, g.isPublic ? '€ ' + g.sharePrice.toFixed(2) : money(valuation(g)))),
         h('div', 'grow'), g.isPublic ? h('span', 'pill ' + (growth >= 0 ? 'good' : 'bad'), (growth >= 0 ? '▲ ' : '▼ ') + (growth * 100).toFixed(1) + '% sinds IPO') : null),
@@ -335,7 +335,7 @@ function tabCert(app: App, g: GameState) {
 // ---------------- Prestaties ----------------
 function tabAch(app: App, g: GameState) {
   const reps = listReplays();
-  return h('div', { style: { display: 'flex', gap: '8px', flex: '1', minHeight: '0' } },
+  return h('div', { class: 'split' },
     h('div', 'panel glass scroll', { style: { flex: '1.2' } } as any,
       h('div', 'lbl', `Prestaties ${Object.keys(g.achievements).length}/${ACHIEVEMENTS.length}`),
       h('div', 'cards', ...ACHIEVEMENTS.map((a) => h('div', { class: 'card' + (g.achievements[a.id] ? ' sel' : ' locked') }, h('div', 'row', h('span', 'ic', g.achievements[a.id] ? a.icon : '🔒'), h('b', { style: { fontSize: '12px' } } as any, a.title)), h('div', 's', a.desc)))),

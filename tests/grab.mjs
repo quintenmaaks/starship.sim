@@ -4,7 +4,7 @@ const [,, url, out, wait = '8000', w = '844', h = '390', dpr = '3'] = process.ar
 const browser = await puppeteer.launch({ executablePath: '/usr/bin/google-chrome', headless: 'new', protocolTimeout: 600000,
   args: ['--no-sandbox', '--use-angle=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist', '--disable-dev-shm-usage'] });
 const page = await browser.newPage();
-await page.setViewport({ width: +w, height: +h, deviceScaleFactor: +dpr, isMobile: true, hasTouch: true, isLandscape: true });
+await page.setViewport({ width: +w, height: +h, deviceScaleFactor: +dpr, isMobile: true, hasTouch: true, isLandscape: +w > +h });
 const logs = [];
 page.on('console', (m) => { if (['error', 'warning', 'warn'].includes(m.type())) logs.push(`[${m.type()}] ${m.text()}`); });
 page.on('pageerror', (e) => logs.push(`[pageerror] ${e.message}\n${e.stack}`));

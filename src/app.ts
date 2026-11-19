@@ -1,5 +1,5 @@
 // App: schermbeheer, 3D-achtergrond (Starbase bij zonsondergang), starten van vluchten en herhalingen.
-import { View } from './render/view';
+import { View2D as View } from './r2d/view2d';
 import { World } from './sim/world';
 import { Ephemeris } from './sim/bodies';
 import { REGIONS } from './sim/terrain';
@@ -52,7 +52,7 @@ export class App {
       this.backdropDesign = key;
     } else if (this.view.world !== this.backdrop) { this.view.setWorld(this.backdrop); this.view.focus = this.backdrop.vehicles[0]; }
     this.view.setCam(cam);
-    this.view.camPitch = 0.1; this.view.zoom = design.booster.enabled ? 0.95 : 1.8; this.view.cineSpin = 0.035;
+    this.view.camPitch = 0.1; this.view.zoom = design.booster.enabled ? 1.15 : 1.9; this.view.cyF = 0.34; this.view.cineSpin = 0.035;
     this.startLoop();
   }
   startLoop() { if (!this.raf) { this.last = performance.now(); this.raf = requestAnimationFrame(this.loop); } }
