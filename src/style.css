@@ -230,3 +230,4 @@ input[type=text] { background: rgba(255,255,255,.06); border: 1px solid var(--li
 .hud .center-col .engines { transform: scale(.72); margin: -7px -6px; }
 @media (max-height: 430px) { .hud .telem { transform: translateX(-50%) scale(.8); transform-origin: bottom center; } }
 .results .box > .row:last-child { position: sticky; bottom: -14px; margin: 0 -16px -14px; padding: 9px 16px; background: rgba(10,14,22,.92); border-top: 1px solid var(--line); border-radius: 0 0 var(--r) var(--r); }
+.card.sel { background: rgba(16,38,56,.82); }

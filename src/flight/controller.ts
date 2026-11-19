@@ -160,7 +160,7 @@ export class FlightController {
     view.focus = setup.focus;
     view.cineSpin = 0; view.zoom = 1;
     view.setCam(setup.focus.state === 'clamped' ? 'tower' : 'chase');
-    if (setup.focus.tel.alt > 100000 && setup.focus.tel.body === 'earth') { view.setCam('free'); view.camYaw = 1.6; view.camPitch = 0.35; view.zoom = 0.5; }
+    if (setup.focus.pos.length() - 6371000 > 100000 && setup.focus.pos.length() < 2e7) { view.setCam('free'); view.camYaw = 1.6; view.camPitch = 0.35; view.zoom = 0.5; }
     if (setup.mission.id === 'lunar' || setup.mission.id === 'crewlunar' || setup.mission.id === 'sc_artemis') view.setCam('chase');
     setup.world.on((e) => this.onEvent(e));
     this.buildControls();
