@@ -50,6 +50,7 @@ export class View {
   camECI = new THREE.Vector3();
   time = 0; frameMs = 16; fps = 60; frames = 0; fpsT = 0;
   shake = 0;
+  cineSpin = 0;
   skyBright = 1;
   localUp = new THREE.Vector3(0, 1, 0);
   sunCol = new THREE.Color();
@@ -249,6 +250,7 @@ export class View {
 
   updateCamera(dt: number) {
     const w = this.world!; const v = this.focus!;
+    if (this.cineSpin) this.camYaw += this.cineSpin * dt;
     const body = v.tel.body || 'earth';
     const c = this.bodyCenter(body, _v3);
     const up = this.localUp.copy(v.pos).sub(c).normalize();
