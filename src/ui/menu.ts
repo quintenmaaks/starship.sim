@@ -1,6 +1,7 @@
 // Hoofdmenu, carrièreslots, vrije vlucht, scenario's, testcentrum, instellingen, records
 import type { App } from '../app';
 import { h, btn, modal, confirmBox, toast } from './dom';
+import { fill } from './dom';
 import { audio } from './audio';
 import { SLOTS, slotInfo, newGame, saveGame, deleteSave, settings, saveSettings, allDesigns, globalRecords, findDesign } from '../game/state';
 import { MISSIONS, MissionDef } from '../game/missions';
@@ -92,7 +93,7 @@ export function sandbox(app: App, cat: 'flight' | 'test' | 'all' = 'all') {
   const list = h('div', 'cards scroll', { style: { flex: '1', alignContent: 'start' } } as any);
   const side = h('div', 'panel glass scroll', { style: { width: '300px' } } as any);
   const renderList = () => {
-    list.replaceChildren(...ms.map((m) => h('div', { class: 'card' + (m === sel ? ' sel' : ''), onClick: () => { sel = m; design = findDesign(null, m.designs[0]); renderList(); renderSide(); app.setBackdrop(design, hour); } },
+    fill(list, ...ms.map((m) => h('div', { class: 'card' + (m === sel ? ' sel' : ''), onClick: () => { sel = m; design = findDesign(null, m.designs[0]); renderList(); renderSide(); app.setBackdrop(design, hour); } },
       h('div', 'row', h('span', 'ic', m.icon), h('div', 'grow'), h('span', 'pill ' + (m.cat === 'test' ? 'acc' : ''), m.cat === 'test' ? 'TEST' : 'VLUCHT'), h('span', 'pill', '★'.repeat(m.hard))),
       h('div', 't', m.title), h('div', 's', m.short),
       globalRecords['score_' + m.id] ? h('div', 'pill gold', 'Beste: ' + Math.round(globalRecords['score_' + m.id])) : null)));
@@ -104,7 +105,7 @@ export function sandbox(app: App, cat: 'flight' | 'test' | 'all' = 'all') {
   };
   const renderSide = () => {
     const designs = allDesigns(null).filter((d) => designAllowed(sel, d));
-    side.replaceChildren(
+    fill(side, 
       h('div', 'row', h('span', { style: { fontSize: '22px' } } as any, sel.icon), h('b', { style: { fontSize: '15px' } } as any, sel.title)),
       h('div', 'dim', { style: { fontSize: '11.5px', lineHeight: '1.35' } } as any, sel.desc),
       h('div', 'lbl', 'Voertuig'), seg(designs.map((d) => [d.id, d.name] as [string, string]), design.id, (id) => { design = findDesign(null, id); app.setBackdrop(design, hour); }),

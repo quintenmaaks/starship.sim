@@ -29,6 +29,7 @@ export function h<K extends keyof HTMLElementTagNameMap>(tag: K, attrs: Record<s
   return e;
 }
 export const btn = (label: string, onClick: () => void, cls = '') => h('button', { class: 'btn ' + cls, onClick }, label);
+export function fill(e: Element, ...kids: (Node | string | null | undefined | false)[]) { e.replaceChildren(...(kids.filter((k) => k !== null && k !== undefined && k !== false) as (Node | string)[])); return e; }
 export function clear(e: HTMLElement) { while (e.firstChild) e.removeChild(e.firstChild); return e; }
 
 let toastBox: HTMLElement | null = null;

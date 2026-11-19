@@ -1,6 +1,7 @@
 // Ontwerper: stel je eigen Starship + Super Heavy samen met live 3D-voorbeeld op het platform
 import type { App } from '../app';
 import { h, btn, toast, confirmBox } from './dom';
+import { fill } from './dom';
 import { audio } from './audio';
 import { GameState, allDesigns, loadSandboxDesigns, saveSandboxDesigns, saveGame } from '../game/state';
 import { Design, designStats, ENGINES, SHIP_VARIANTS, FLAPS, HEATSHIELDS, GRIDFINS, ShipDesign, BUILTIN_DESIGNS } from '../game/parts';
@@ -48,7 +49,7 @@ export function showDesigner(app: App, g: GameState | null, back: () => void, st
     for (const x of designs()) pick.append(h('option', { value: x.id, selected: x.id === d.id ? 'selected' : null }, (x.builtin ? '★ ' : '') + x.name));
     pick.addEventListener('change', () => { d = clone(designs().find((x) => x.id === pick.value)!); changed(); });
     const engOpts = (kind: 'sl' | 'vac') => Object.values(ENGINES).filter((e) => e.kind === kind).map((e) => ({ v: e.id, l: e.name.replace('Raptor Vacuum', 'RVac'), lock: e.unlock }));
-    side.replaceChildren(
+    fill(side, 
       h('div', 'lbl', 'Ontwerp'), pick, nameInp,
       h('div', 'lbl', { style: { marginTop: '6px' } } as any, '🔵 Super Heavy (eerste trap)'),
       opt('Booster', seg([{ v: false, l: 'Geen' }, { v: true, l: 'Super Heavy', lock: 'orbital' }], b.enabled && s.variant !== 'hopper', (v) => (b.enabled = v))),
@@ -83,7 +84,7 @@ export function showDesigner(app: App, g: GameState | null, back: () => void, st
     const kv = (k: string, v: string, cls = '') => h('div', 'kv', h('span', null, k), h('b', { class: cls }, v));
     const twrCls = st.liftoffTWR < 1.05 ? 'bad' : st.liftoffTWR < 1.25 ? 'warn' : 'good';
     const dvPct = Math.min(1, st.dvTotal / 12000);
-    stats.replaceChildren(
+    fill(stats, 
       h('div', 'lbl', 'Prestaties'),
       h('div', { style: { fontSize: '26px', fontWeight: 900, fontFamily: 'var(--mono)' } } as any, Math.round(st.dvTotal).toLocaleString('nl-NL') + ' m/s'),
       h('div', 'dim', { style: { fontSize: '10px' } } as any, 'Totale Δv'),

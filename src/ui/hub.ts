@@ -1,6 +1,7 @@
 // Hoofdkwartier (carrière): tabbladen voor missies, contracten, vloot, R&D, faciliteiten, team, financiën, certificering, prestaties
 import type { App } from '../app';
 import { h, btn, modal, toast, confirmBox, lineChart } from './dom';
+import { fill } from './dom';
 import { audio } from './audio';
 import { GameState, saveGame, findDesign, Build } from '../game/state';
 import { MISSIONS, MissionDef, MISSION_BY_ID } from '../game/missions';
@@ -37,7 +38,7 @@ export function showHub(app: App, tab?: string) {
   const body = h('div', 'body');
   const render = () => {
     const sp = g.isPublic ? g.stock.length > 1 ? g.sharePrice / g.stock[Math.max(0, g.stock.length - 8)].p - 1 : 0 : 0;
-    topbar.replaceChildren(
+    fill(topbar, 
       btn('☰', () => hubMenu(app), 'small ghost'),
       h('div', null, h('div', 'title', g.company), h('div', 'dim', { style: { fontSize: '10px' } } as any, dateStr(g) + ' · dag ' + Math.floor(g.day))),
       h('div', 'grow'),
@@ -47,8 +48,8 @@ export function showHub(app: App, tab?: string) {
       g.isPublic ? h('div', 'stat', h('span', 'lbl', 'Aandeel'), h('b', { style: { color: sp >= 0 ? '#4be38a' : '#ff7a6a' } }, '€ ' + g.sharePrice.toFixed(2) + (sp >= 0 ? ' ▲' : ' ▼'))) : null,
       btn('+1 dag', () => { skip(1); }, 'small'),
       btn('⏭ ' + skipLabel(g), () => skip(skipDays(g)), 'small primary'));
-    tabs.replaceChildren(...TABS.map(([id, l]) => h('div', { class: 'tab' + (id === curTab ? ' on' : ''), onClick: () => { curTab = id; render(); } }, l, badge(g, id) ? h('i', 'dot') : null)));
-    body.replaceChildren(TABFN[curTab](app, g, render));
+    fill(tabs, ...TABS.map(([id, l]) => h('div', { class: 'tab' + (id === curTab ? ' on' : ''), onClick: () => { curTab = id; render(); } }, l, badge(g, id) ? h('i', 'dot') : null)));
+    fill(body, TABFN[curTab](app, g, render));
   };
   const skip = (days: number) => {
     const before = new Set(Object.keys(g.research)); const nb = g.builds.filter((b) => b.ready).length;
@@ -110,7 +111,7 @@ function tabOverview(app: App, g: GameState, render: () => void) {
       kv('Reeks', String(g.stats.streak) + ' 🔥'), kv('Waardering', money(valuation(g)))));
   const right = h('div', 'panel glass scroll', { style: { flex: '1' } } as any,
     h('div', 'lbl', '📰 Nieuws'),
-    ...(g.news.length ? g.news.slice(0, 25).map((n) => h('div', 'news ' + n.kind, h('span', 'd', gameDate(n.day)), n.text)) : [h('div', 'dim', 'Welkom in Starbase! Het verhaal van je bedrijf begint hier.')]));
+    ...(g.news.length ? g.news.slice(0, 25).map((n) => h('div', 'news ' + n.kind, h('span', 'd', gameDate(n.day)), n.text)) : [h('div', 'dim', { style: { fontSize: '12px' } } as any, 'Welkom in Starbase! Het verhaal van je bedrijf begint hier. Vlieg je eerste hop en de pers volgt vanzelf.')]));
   return h('div', { style: { display: 'flex', gap: '8px', flex: '1', minHeight: '0' } }, left, right);
 }
 
@@ -146,7 +147,7 @@ export function prepDialog(app: App, m: MissionDef) {
     const rel = reliabilityFor(g, design, prep, build);
     const days = prepDays(m, prep, g), wait = padWait(g, m), cost = prepCost(g, m, prep);
     const segs = (opts: [any, string][], cur: any, set: (v: any) => void) => h('div', 'seg', ...opts.map(([v, l]) => btn(l, () => { set(v); draw(); }, 'small' + (v === cur ? ' on' : ''))));
-    body.replaceChildren(
+    fill(body, 
       h('div', 'dim', { style: { fontSize: '11.5px', marginBottom: '6px' } } as any, m.desc),
       h('div', 'lbl', 'Voertuig'),
       testArticle ? h('div', 'pill acc', 'Testtank (wordt meegeleverd)') :
@@ -364,7 +365,7 @@ function tutorial(app: App, g: GameState, render: () => void) {
   const box = h('div', 'tut glass', { style: { left: '50%', bottom: 'calc(14px + var(--sab))', transform: 'translateX(-50%)' } } as any);
   const draw = () => {
     const [t, s] = steps[i];
-    box.replaceChildren(h('div', null, h('b', null, t)), h('div', { html: s, style: { marginTop: '4px' } }),
+    fill(box, h('div', null, h('b', null, t)), h('div', { html: s, style: { marginTop: '4px' } }),
       h('div', 'row', h('span', 'dim', `${i + 1}/${steps.length}`), h('div', 'grow'), btn('Overslaan', () => end(), 'tiny ghost'), btn(i === steps.length - 1 ? 'Aan de slag!' : 'Volgende', () => { i++; if (i >= steps.length) end(); else draw(); }, 'tiny primary')));
   };
   const end = () => { g.tutorial.done = true; saveGame(g); box.remove(); render(); };

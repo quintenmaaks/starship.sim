@@ -23,6 +23,8 @@ export function installQA(app: App) {
       }
       w.warp = 1; return { t: w.t, alt: f.focus.tel.alt, state: f.focus.state, name: f.focus.name };
     },
+    newCareer: () => { const g = newGame('Polder Orbital', 'career', 2); saveGame(g); app.g = g; app.hub('overzicht'); },
+    end: () => { const fc = (window as any).__fc; fc.setup.end ? fc.setup.end('QA') : null; },
     career: (tab?: string) => {
       const g = newGame('Noordzee Aerospace', 'career', 3);
       g.research.orbital = true; g.research.raptor2 = true; g.research.hotstage = true; g.research.catch = true;
