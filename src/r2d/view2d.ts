@@ -156,6 +156,12 @@ export class View2D {
     let mode = this.camMode;
     const reg = this.nearestRegion(v.pos);
     let target = v.pos.clone().addScaledVector(v.nose(_a), L * 0.5);
+    // dichtbij de grond: automatisch uitzoomen zodat het terrein in beeld blijft (minstens ~30 px voertuig)
+    if ((mode === 'chase' || mode === 'drone') && v.state === 'flying' && v.tel.agl < 6000 && (v.tel.vVert < -3 || v.tel.agl < 120)) {
+      const fit = this.H * 0.4 / (Math.max(0, v.tel.agl) + L * 0.5 + 20);
+      s0 = Math.max(Math.min(s0, fit), 45 / L);
+      target = target.clone().addScaledVector(this.up, -Math.min(v.tel.agl, 0.4 * this.H / s0) * 0.5);
+    }
     if (mode === 'drone') s0 *= 0.25;
     if (mode === 'onboard') s0 *= 2.2;
     if (mode === 'tower' && reg && reg.d < 60000) {
