@@ -171,7 +171,7 @@ export function planTLI(w: World, v: Vehicle, targetPeri = 110000): ManeuverNode
     return Math.abs(minD - b);
   };
   for (let tDep = 120; tDep < period + 120; tDep += 90) {
-    for (let dv = 3040; dv <= 3200; dv += 20) {
+    for (let dv = 3060; dv <= 3190; dv += 5) {
       const s = evalCand(tDep, dv);
       if (!best || s < best.score) best = { t: tDep, dv, score: s };
     }
@@ -179,7 +179,7 @@ export function planTLI(w: World, v: Vehicle, targetPeri = 110000): ManeuverNode
   if (!best) return null;
   // verfijnen
   for (let it = 0; it < 3; it++) {
-    const st = [30, 10, 3][it], sd = [6, 2, 0.6][it];
+    const st = [30, 10, 3][it], sd = [2, 0.7, 0.25][it];
     let b2 = best;
     for (let dt = -3; dt <= 3; dt++) for (let dd = -3; dd <= 3; dd++) {
       const t = best.t + dt * st, dv = best.dv + dd * sd;
@@ -198,17 +198,31 @@ export function planTLI(w: World, v: Vehicle, targetPeri = 110000): ManeuverNode
 
 // ===== Maanbaaninbrenging (LOI) bij periapsis =====
 export class LunarCaptureProgram extends Program {
-  burn: BurnProgram | null = null; captured = false;
-  constructor(v: Vehicle) { super(v); this.phase = 'Kustvlucht naar de Maan'; }
+  burn: BurnProgram | null = null; captured = false; corr: BurnProgram | null = null; corrDone = false; loiT = -1; loiOn = false;
+  constructor(v: Vehicle, public targetPeri = 110000) { super(v); this.phase = 'Kustvlucht naar de Maan'; }
   update(dt: number, w: World) {
     const v = this.v;
     if (v.state !== 'flying') { this.done = true; return; }
     const mp = w.ephem.moonPos(w.t), mv = w.ephem.moonVel(w.t);
     const r = v.pos.clone().sub(mp), vel = v.vel.clone().sub(mv);
-    if (this.burn) {
-      this.burn.update(dt, w);
-      this.phase = this.burn.phase; this.status = this.burn.status;
-      if (this.burn.done) { this.done = true; this.captured = true; const el = elements(r, vel, MU_M, R_M); w.emit(`In maanbaan: ${(el.apo / 1000).toFixed(0)} × ${(el.peri / 1000).toFixed(0)} km`, 'seco', v, { apo: el.apo, peri: el.peri }); }
+    if (this.loiT > 0) {
+      // gesloten-lus LOI: retrograde tot de baan rond is
+      const el = elements(r, vel, MU_M, R_M);
+      const retro = vel.clone().normalize().negate();
+      point(v, retro, r.clone().normalize().negate());
+      let F = 0; for (const e of v.active.engines) if (!e.failed) F += e.spec.thrustVac;
+      const tBurn = Math.max(1, (vel.length() - Math.sqrt(MU_M / r.length())) * v.mass / Math.max(F, 1));
+      if (!this.loiOn && w.t < this.loiT - tBurn / 2) { this.phase = 'Maanbaaninbrenging (LOI)'; this.status = `over ${(this.loiT - tBurn / 2 - w.t).toFixed(0)} s`; v.cmdThrottle = 0; if (this.loiT - tBurn / 2 - w.t < 40 && w.warp > 4) w.warp = 1; return; }
+      if (!this.loiOn && angleTo(v, retro) > 5) { this.phase = 'LOI: richten'; v.cmdThrottle = 0; return; }
+      if (!this.loiOn) { this.loiOn = true; v.selectEngines('all'); w.emit('LOI-brand: ontsteking', 'liftoff', v); }
+      const excess = vel.length() - Math.sqrt(MU_M / r.length());
+      v.cmdThrottle = Math.min(excess > 40 ? 1 : clamp(excess / 40, 0.4, 1), 3.2 * G0 * v.mass / Math.max(F, 1));
+      this.phase = 'LOI-brand'; this.status = el.e < 1 ? `Apolunium ${(el.apo / 1000).toFixed(0)} km` : 'Hyperbolisch';
+      if (excess <= 0.5 || v.active.prop <= 0) {
+        v.cmdThrottle = 0; this.done = true; this.captured = el.e < 1 && el.peri > 10000;
+        if (this.captured) w.emit(`In maanbaan: ${(el.apo / 1000).toFixed(0)} × ${(el.peri / 1000).toFixed(0)} km`, 'seco', v, { apo: el.apo, peri: el.peri });
+        else w.emit(el.e >= 1 ? 'LOI mislukt: brandstof op' : 'LOI mislukt: periluna te laag!', 'fail', v);
+      }
       return;
     }
     if (r.length() > MOON_SOI) {
@@ -217,9 +231,35 @@ export class LunarCaptureProgram extends Program {
       this.status = `Afstand tot Maan ${(d / 1000).toFixed(0)} km`;
       return;
     }
-    // in SOI: zoek periapsis
+    // in SOI: eerst periluna corrigeren (b-vlak), daarna LOI
+    if (this.corr) {
+      this.corr.update(dt, w); this.phase = 'Periluna-correctie'; this.status = this.corr.phase;
+      if (this.corr.done) { this.corr = null; this.corrDone = true; }
+      return;
+    }
     const el = elements(r, vel, MU_M, R_M);
     this.status = `Periluna ${(el.peri / 1000).toFixed(0)} km`;
+    if (!this.corrDone && Math.abs(el.peri - this.targetPeri) > 20000 && r.dot(vel) < 0) {
+      const lead = 120;
+      const r1 = new THREE.Vector3(), v1 = new THREE.Vector3();
+      kepler(r, vel, lead, MU_M, r1, v1);
+      const pro = v1.clone().normalize();
+      const nrm = r1.clone().cross(v1).normalize();
+      const rad = nrm.clone().cross(pro).normalize();
+      const periFor = (d: number) => elements(r1, v1.clone().addScaledVector(rad, d), MU_M, R_M).peri;
+      // bisectie op radiale Δv
+      let lo = -400, hi = 400;
+      const f = (d: number) => periFor(d) - this.targetPeri;
+      // kies het interval met tekenwissel dichtst bij 0
+      let best = 0, bestErr = Math.abs(f(0));
+      for (let d = -400; d <= 400; d += 10) { const e = Math.abs(f(d)); if (e < bestErr) { bestErr = e; best = d; } }
+      lo = best - 10; hi = best + 10;
+      for (let i = 0; i < 30; i++) { const m = (lo + hi) / 2; if (Math.abs(f(m)) < Math.abs(f(lo)) && Math.abs(f(m)) < Math.abs(f(hi))) { if (Math.abs(f((lo + m) / 2)) < Math.abs(f((m + hi) / 2))) hi = m; else lo = m; } else if (Math.abs(f(lo)) < Math.abs(f(hi))) hi = m; else lo = m; }
+      const dv = (lo + hi) / 2;
+      this.corr = new BurnProgram(v, { t: w.t + lead, pro: 0, nrm: 0, rad: dv }, 'Periluna-correctie', 'vac');
+      w.emit(`Periluna-correctie gepland: ${Math.abs(dv).toFixed(0)} m/s (periluna nu ${(el.peri / 1000).toFixed(0)} km)`, 'info', v);
+      return;
+    }
     if (r.dot(vel) < 0) {
       // tijd tot periapsis via propagatie
       const tr = new THREE.Vector3(), tv = new THREE.Vector3();
@@ -228,11 +268,11 @@ export class LunarCaptureProgram extends Program {
       kepler(r, vel, best, MU_M, tr, tv);
       const vc = Math.sqrt(MU_M / tr.length());
       const dv = tv.length() - vc;
-      this.burn = new BurnProgram(v, { t: w.t + best, pro: -dv, nrm: 0, rad: 0 }, 'Maanbaaninbrenging (LOI)', 'all');
+      this.loiT = w.t + best;
       w.emit(`LOI gepland: ${dv.toFixed(0)} m/s over ${(best / 60).toFixed(0)} min`, 'info', v);
     }
   }
-  busy() { return !!this.burn && this.burn.busy(); }
+  busy() { return this.loiOn && !this.done || (!!this.corr && this.corr.busy()); }
 }
 
 // ===== Programmareeks =====
