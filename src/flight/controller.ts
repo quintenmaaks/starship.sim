@@ -146,7 +146,7 @@ export class FlightController {
   transitionEl: HTMLElement | null = null; transT = 0;
   aborted = false; anyRud = false; enginesFailed = 0;
   ui: Record<string, HTMLElement> = {};
-  fpsEl: HTMLElement | null = null;
+  fpsEl: HTMLElement | null = null; mapInfo: HTMLElement | null = null;
   pressureEl: HTMLElement | null = null;
   constructor(public view: View, public setup: FlightSetup, public onEnd: (r: FlightResult) => void, public onRestart: () => void) {
     const ui = document.getElementById('ui')!;
@@ -402,6 +402,12 @@ export class FlightController {
     this.raf = requestAnimationFrame(this.loop);
     const dt = Math.min(0.1, (now - this.last) / 1000); this.last = now;
     const s = this.setup, w = s.world;
+    if (this.view.camMode === 'map' && this.view.mapLines.info) {
+      const inf = this.view.mapLines.info; const km = (x: number) => isFinite(x) ? (x / 1000).toLocaleString('nl-NL', { maximumFractionDigits: 0 }) + ' km' : '∞';
+      if (!this.mapInfo) { this.mapInfo = h('div', 'glass', ''); Object.assign(this.mapInfo.style, { position: 'absolute', top: 'calc(86px + var(--sat))', left: '50%', transform: 'translateX(-50%)', padding: '5px 12px', fontSize: '12px', fontFamily: 'var(--mono)', zIndex: '6' }); this.root.append(this.mapInfo); }
+      this.mapInfo.style.display = '';
+      this.mapInfo.innerHTML = `<span style="color:#ffb347">● Apo ${km(inf.apo)}</span> &nbsp; <span style="color:#5fd4ff">● Peri ${km(inf.peri)}</span> &nbsp; <span style="opacity:.7">${inf.body === 'moon' ? 'Maan' : 'Aarde'}</span>`;
+    } else if (this.mapInfo) this.mapInfo.style.display = 'none';
     if (this.fpsEl) this.fpsEl.textContent = `${this.view.fps.toFixed(0)} fps · ${this.view.renderer.getPixelRatio().toFixed(1)}x`;
     // overgang (tijdsprong)
     if (s.transition && !this.transitionEl) {

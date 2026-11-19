@@ -16,6 +16,7 @@ import { skyColorJS, sunTransmittance } from './atmo';
 import { QualityPreset, currentPreset } from './quality';
 import { clamp } from '../core/util';
 import { Flare } from './flare';
+import { MapLines } from './maplines';
 
 export type CamMode = 'chase' | 'tower' | 'onboard' | 'drone' | 'free' | 'map';
 export const CAM_LABELS: Record<CamMode, string> = { chase: 'Volgcamera', tower: 'Torencamera', onboard: 'Boordcamera', drone: 'Dronecamera', free: 'Vrije camera', map: 'Kaart' };
@@ -55,6 +56,7 @@ export class View {
   localUp = new THREE.Vector3(0, 1, 0);
   sunCol = new THREE.Color();
   mapGroup = new THREE.Group();
+  mapLines = new MapLines();
   onBeforeRender: (() => void) | null = null;
   replaySample: (() => void) | null = null;
   canvas: HTMLCanvasElement;
@@ -91,7 +93,7 @@ export class View {
     this.scene.fog = new THREE.FogExp2(0xaabbcc, 0.00002);
     this.smoke = new Particles(this.qp.particles, false);
     this.fire = new Particles(Math.floor(this.qp.particles * 0.6), true);
-    this.scene.add(this.smoke.mesh, this.fire.mesh, this.mapGroup);
+    this.scene.add(this.smoke.mesh, this.fire.mesh, this.mapGroup); this.mapGroup.add(this.mapLines.group);
     // nabewerking
     const rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples: this.qp.antialias ? 4 : 0 });
     this.composer = new EffectComposer(this.renderer, rt);
@@ -321,7 +323,13 @@ export class View {
       const r = v.pos.length();
       const dist = Math.max(R_E * 3.2, r * 2.4) * this.zoom;
       const centerB = body === 'moon' && this.zoom < 0.4 ? c.clone() : new THREE.Vector3();
-      pos.copy(centerB).addScaledVector(new THREE.Vector3(Math.cos(this.camPitch) * Math.sin(this.camYaw), Math.sin(this.camPitch), Math.cos(this.camPitch) * Math.cos(this.camYaw)), dist);
+      // camera boven het voertuig, yaw/pitch als verschuiving
+      const d0 = v.pos.clone().sub(centerB).normalize();
+      const rt = new THREE.Vector3(0, 1, 0).cross(d0); if (rt.lengthSq() < 1e-6) rt.set(1, 0, 0); rt.normalize();
+      const up2 = d0.clone().cross(rt).normalize();
+      const yy = this.camYaw * 0.5, pp = this.camPitch;
+      const dir = d0.multiplyScalar(Math.cos(pp) * Math.cos(yy)).addScaledVector(rt, Math.cos(pp) * Math.sin(yy)).addScaledVector(up2, Math.sin(pp));
+      pos.copy(centerB).addScaledVector(dir, dist);
       look.copy(centerB);
       camUp.set(0, 1, 0);
       fov = 45;
@@ -392,6 +400,11 @@ export class View {
     // ruimte
     const moonPos = ep.moonPos(w.t, new THREE.Vector3());
     this.space.update({ origin: o, camECI: this.camECI, camLocal: this.camera.position, sun, earthQ: ep.earthQuat(w.t, new THREE.Quaternion()), moonPos, moonQ: ep.moonQuat(w.t, new THREE.Quaternion()), t: w.t, skyBright: this.skyBright, pixelRatio: this.renderer.getPixelRatio() });
+    // baanlijnen in kaartweergave
+    const showMap = this.camMode === 'map';
+    this.mapLines.t += dt;
+    if (!showMap) this.mapLines.group.visible = false;
+    else { if (this.mapLines.t > 0.25 || !this.mapLines.group.visible) { this.mapLines.t = 0; this.mapLines.update(w, this.focus, o, this.camECI.distanceTo(this.focus?.pos || this.camECI), true); } this.mapLines.place(o); }
     // belichtingsaanpassing: in de ruimte iets donkerder (felle zon)
     this.renderer.toneMappingExposure = camAlt > 60000 ? 0.85 : 1.0;
     // regio's
